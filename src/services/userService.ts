@@ -1,8 +1,6 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 
-const prisma = new PrismaClient();
-
-export interface CreateUserParams {
+interface CreateUserParams {
   id: string;
   username: string;
 }
@@ -14,7 +12,6 @@ export class UserService {
     });
 
     if (user) {
-      // Update username if it has changed
       if (user.username !== params.username) {
         return prisma.user.update({
           where: { id: params.id },
@@ -24,16 +21,16 @@ export class UserService {
       return user;
     }
 
-    // Create new user if doesn't exist
     return prisma.user.create({
       data: {
         id: params.id,
         username: params.username,
+        points: 1000, // Starting points
       },
     });
   }
 
-  static async getUserPoints(userId: string) {
+  static async getUserPoints(userId: string): Promise<number> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { points: true },
@@ -74,7 +71,6 @@ export class UserService {
   }> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { lastDailyClaim: true },
     });
 
     if (!user) {
