@@ -6,9 +6,16 @@ import { PredictionQueue } from "./predictionQueue";
 import { EmbedBuilder, TextChannel } from "discord.js";
 import { client } from "../index";
 
+// Maximum points that can be wagered based on timeframe
+const MAX_WAGER_BY_TIMEFRAME = {
+  "1m": 100, // 1 minute: max 100 points
+  "1h": 500, // 1 hour: max 500 points
+  "1d": 1000, // 1 day: max 1000 points
+};
+
 export class PredictionService {
   static async createPrediction(
-    params: CreatePredictionParams
+    params: CreatePredictionParams & { pointsWagered: number }
   ): Promise<Prediction> {
     console.log("Creating prediction with params:", {
       userId: params.userId,
@@ -17,11 +24,32 @@ export class PredictionService {
       timeframe: params.timeframe,
       direction: params.direction,
       expiresAt: params.expiresAt,
+      pointsWagered: params.pointsWagered,
     });
+
+    // Check if user has enough points
+    const user = await UserService.getUserPoints(params.userId);
+    if (user < params.pointsWagered) {
+      throw new Error("Not enough points");
+    }
+
+    // Check if wager is within limits
+    const maxWager =
+      MAX_WAGER_BY_TIMEFRAME[
+        params.timeframe as keyof typeof MAX_WAGER_BY_TIMEFRAME
+      ];
+    if (params.pointsWagered > maxWager) {
+      throw new Error(
+        `Maximum wager for ${params.timeframe} is ${maxWager} points`
+      );
+    }
 
     // Get the current price of the token
     const priceAtStart = await TokenService.getTokenPrice(params.tokenAddress);
     console.log("Got initial price:", priceAtStart);
+
+    // Deduct points from user
+    await UserService.updatePoints(params.userId, -params.pointsWagered);
 
     // Create the prediction with the start price
     const prediction = await prisma.prediction.create({
@@ -33,6 +61,7 @@ export class PredictionService {
         direction: params.direction,
         expiresAt: params.expiresAt,
         priceAtStart,
+        pointsWagered: params.pointsWagered,
       },
     });
     console.log("Created prediction in database:", prediction);
@@ -57,8 +86,6 @@ export class PredictionService {
         predictionId: prediction.id,
         error: error instanceof Error ? error.message : error,
       });
-      // We don't throw here because the prediction is already created in the database
-      // The queue will be retried on the next bot restart
     }
 
     return prediction;
@@ -119,7 +146,8 @@ export class PredictionService {
         ? priceAtEnd > priceAtStart
         : priceAtEnd < priceAtStart;
 
-    const pointsToAdd = isWon ? 10 : -5;
+    // Calculate points to add (double the wagered points if won, 0 if lost)
+    const pointsToAdd = isWon ? prediction.pointsWagered * 2 : 0;
     console.log("Prediction result:", {
       predictionId,
       isWon,
@@ -169,8 +197,13 @@ export class PredictionService {
               inline: true,
             },
             {
-              name: "Points",
-              value: `${pointsToAdd > 0 ? "+" : ""}${pointsToAdd}`,
+              name: "Points Wagered",
+              value: `${prediction.pointsWagered}`,
+              inline: true,
+            },
+            {
+              name: "Points Won",
+              value: isWon ? `+${pointsToAdd}` : "0",
               inline: true,
             },
             {
