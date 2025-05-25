@@ -6,24 +6,17 @@ import Queue from "bull";
 interface PredictionJob {
   id: string;
   tokenAddress: string;
+  priceAtStart?: number;
   expiresAt: Date;
-  priceAtStart: number;
 }
 
 export class PredictionQueue {
   private static queue: Queue.Queue<PredictionJob>;
-  private static isInitialized = false;
+  private static instance: PredictionQueue | null = null;
 
-  static async initialize() {
-    if (this.isInitialized) return;
-
-    console.log("Initializing Redis connection...");
-    console.log(
-      `Connecting to Redis at ${process.env.REDIS_HOST}:${process.env.REDIS_PORT}`
-    );
-
+  private constructor() {
     // Create a new queue
-    this.queue = new Queue("prediction-queue", {
+    PredictionQueue.queue = new Queue("prediction-queue", {
       redis: {
         host: process.env.REDIS_HOST,
         port: parseInt(process.env.REDIS_PORT || "6379"),
@@ -41,17 +34,8 @@ export class PredictionQueue {
       },
     });
 
-    // Test Redis connection
-    try {
-      await this.queue.isReady();
-      console.log("Successfully connected to Redis!");
-    } catch (error) {
-      console.error("Failed to connect to Redis:", error);
-      throw error;
-    }
-
     // Process jobs
-    this.queue.process(async (job) => {
+    PredictionQueue.queue.process(async (job) => {
       const { id, tokenAddress, priceAtStart } = job.data;
 
       try {
@@ -63,7 +47,7 @@ export class PredictionQueue {
         await PredictionService.resolvePrediction(
           id,
           currentPrice,
-          priceAtStart
+          priceAtStart || currentPrice // Use current price as fallback
         );
         console.log(`Successfully processed prediction ${id}`);
       } catch (error) {
@@ -73,26 +57,60 @@ export class PredictionQueue {
     });
 
     // Handle completed jobs
-    this.queue.on("completed", (job) => {
+    PredictionQueue.queue.on("completed", (job) => {
       console.log(`Job ${job.id} completed for prediction ${job.data.id}`);
     });
 
     // Handle failed jobs
-    this.queue.on("failed", (job, error) => {
+    PredictionQueue.queue.on("failed", (job, error) => {
       console.error(
         `Job ${job?.id} failed for prediction ${job?.data.id}:`,
         error
       );
     });
+  }
 
-    this.isInitialized = true;
+  static async initialize() {
+    if (this.instance) {
+      return this.instance;
+    }
+
+    console.log("Initializing Redis connection...");
+    console.log(
+      `Connecting to Redis at ${process.env.REDIS_HOST}:${process.env.REDIS_PORT}`
+    );
+
+    this.instance = new PredictionQueue();
+    await this.queue.isReady();
+    console.log("Successfully connected to Redis!");
+
+    // Log initial queue state
+    const stats = await this.queue.getJobCounts();
+    console.log("Initial queue state:", {
+      waiting: stats.waiting,
+      active: stats.active,
+      completed: stats.completed,
+      failed: stats.failed,
+      delayed: stats.delayed,
+    });
+
+    // If there are any jobs, log their details
+    if (stats.waiting > 0 || stats.active > 0) {
+      const jobs = await this.queue.getJobs(["waiting", "active"], 0, 10);
+      console.log(
+        "Current jobs in queue:",
+        jobs.map((job) => ({
+          id: job.id,
+          data: job.data,
+          timestamp: job.timestamp,
+        }))
+      );
+    }
+
+    return this.instance;
   }
 
   static async addPrediction(prediction: Prediction) {
-    if (!this.isInitialized) {
-      await this.initialize();
-    }
-
     // Calculate delay until expiration
     const delay = prediction.expiresAt.getTime() - Date.now();
     if (delay < 0) {
@@ -106,7 +124,7 @@ export class PredictionQueue {
         id: prediction.id,
         tokenAddress: prediction.tokenAddress,
         expiresAt: prediction.expiresAt,
-        priceAtStart: prediction.priceAtStart!,
+        priceAtStart: prediction.priceAtStart || undefined, // Convert null to undefined
       },
       {
         delay,
@@ -120,30 +138,10 @@ export class PredictionQueue {
   }
 
   static async getQueueStats() {
-    if (!this.isInitialized) {
-      await this.initialize();
-    }
-
-    const [waiting, active, completed, failed] = await Promise.all([
-      this.queue.getWaitingCount(),
-      this.queue.getActiveCount(),
-      this.queue.getCompletedCount(),
-      this.queue.getFailedCount(),
-    ]);
-
-    return {
-      waiting,
-      active,
-      completed,
-      failed,
-    };
+    return await this.queue.getJobCounts();
   }
 
   static async getFailedJobs() {
-    if (!this.isInitialized) {
-      await this.initialize();
-    }
-
     const failedJobs = await this.queue.getFailed();
     return failedJobs.map((job) => ({
       id: job.data.id,
@@ -154,10 +152,6 @@ export class PredictionQueue {
   }
 
   static async retryFailedJob(jobId: string) {
-    if (!this.isInitialized) {
-      await this.initialize();
-    }
-
     const job = await this.queue.getJob(jobId);
     if (job) {
       await job.retry();
