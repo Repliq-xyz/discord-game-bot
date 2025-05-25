@@ -1,7 +1,7 @@
 import { Prediction } from "../types/Prediction";
 import { TokenService } from "./tokenService";
 import { PredictionService } from "./predictionService";
-import Queue from "bull";
+import { Queue, Worker, Job, Job as BullMQJob } from "bullmq";
 
 interface PredictionJob {
   id: string;
@@ -11,81 +11,102 @@ interface PredictionJob {
 }
 
 export class PredictionQueue {
-  private static queue: Queue.Queue<PredictionJob>;
+  private static queue: Queue<PredictionJob>;
+  private static worker: Worker<PredictionJob>;
   private static instance: PredictionQueue | null = null;
 
   private constructor() {
     try {
       console.log("Creating new queue instance...");
       // Create a new queue
-      PredictionQueue.queue = new Queue(
-        "prediction-queue",
-        process.env.REDIS_URL!,
-        {
-          defaultJobOptions: {
-            attempts: 3,
-            backoff: {
-              type: "exponential",
-              delay: 1000,
-            },
-            removeOnComplete: true,
-            removeOnFail: false,
+      PredictionQueue.queue = new Queue<PredictionJob>("prediction-queue", {
+        connection: {
+          host: process.env.REDIS_HOST,
+          port: parseInt(process.env.REDIS_PORT || "6379"),
+          password: process.env.REDIS_PASSWORD,
+          tls: {}, // Enable TLS for Railway Redis
+        },
+        defaultJobOptions: {
+          attempts: 3,
+          backoff: {
+            type: "exponential",
+            delay: 1000,
           },
-          redis: {
+          removeOnComplete: true,
+          removeOnFail: false,
+        },
+      });
+
+      console.log("Queue instance created, setting up worker...");
+
+      // Create worker to process jobs
+      PredictionQueue.worker = new Worker<PredictionJob>(
+        "prediction-queue",
+        async (job: Job<PredictionJob>) => {
+          console.log(`Processing job ${job.id} for prediction ${job.data.id}`);
+          const { id, tokenAddress, priceAtStart } = job.data;
+
+          try {
+            const currentPrice = await TokenService.getTokenPrice(tokenAddress);
+            if (currentPrice === undefined) {
+              throw new Error(`Could not get price for token ${tokenAddress}`);
+            }
+
+            await PredictionService.resolvePrediction(
+              id,
+              currentPrice,
+              priceAtStart || currentPrice // Use current price as fallback
+            );
+            console.log(`Successfully processed prediction ${id}`);
+          } catch (error) {
+            console.error(`Error processing prediction ${id}:`, error);
+            throw error; // This will trigger a retry
+          }
+        },
+        {
+          connection: {
+            host: process.env.REDIS_HOST,
+            port: parseInt(process.env.REDIS_PORT || "6379"),
+            password: process.env.REDIS_PASSWORD,
             tls: {}, // Enable TLS for Railway Redis
           },
         }
       );
 
-      console.log("Queue instance created, setting up processors...");
-
-      // Process jobs
-      PredictionQueue.queue.process(async (job) => {
-        console.log(`Processing job ${job.id} for prediction ${job.data.id}`);
-        const { id, tokenAddress, priceAtStart } = job.data;
-
-        try {
-          const currentPrice = await TokenService.getTokenPrice(tokenAddress);
-          if (currentPrice === undefined) {
-            throw new Error(`Could not get price for token ${tokenAddress}`);
-          }
-
-          await PredictionService.resolvePrediction(
-            id,
-            currentPrice,
-            priceAtStart || currentPrice // Use current price as fallback
-          );
-          console.log(`Successfully processed prediction ${id}`);
-        } catch (error) {
-          console.error(`Error processing prediction ${id}:`, error);
-          throw error; // This will trigger a retry
-        }
-      });
-
       // Handle completed jobs
-      PredictionQueue.queue.on("completed", (job) => {
-        console.log(`Job ${job.id} completed for prediction ${job.data.id}`);
-      });
+      PredictionQueue.worker.on(
+        "completed",
+        (job: Job<PredictionJob>, result: any) => {
+          console.log(`Job ${job.id} completed for prediction ${job.data.id}`);
+        }
+      );
 
       // Handle failed jobs
-      PredictionQueue.queue.on("failed", (job, error) => {
-        console.error(
-          `Job ${job?.id} failed for prediction ${job?.data.id}:`,
-          error
-        );
-      });
+      PredictionQueue.worker.on(
+        "failed",
+        (job: Job<PredictionJob> | undefined, error: Error) => {
+          console.error(
+            `Job ${job?.id} failed for prediction ${job?.data.id}:`,
+            error
+          );
+        }
+      );
 
       // Handle stalled jobs
-      PredictionQueue.queue.on("stalled", (job) => {
-        console.warn(`Job ${job.id} stalled for prediction ${job.data.id}`);
+      PredictionQueue.worker.on("stalled", (jobId: string, prev: string) => {
+        console.warn(`Job ${jobId} stalled for prediction ${prev}`);
       });
 
       // Handle error events
-      PredictionQueue.queue.on("error", (error) => {
+      PredictionQueue.worker.on("error", (error: Error) => {
+        console.error("Worker error:", error);
+      });
+
+      PredictionQueue.queue.on("error", (error: Error) => {
         console.error("Queue error:", error);
       });
 
-      console.log("Queue processors set up successfully");
+      console.log("Worker set up successfully");
     } catch (error) {
       console.error("Error creating queue instance:", error);
       throw error;
@@ -98,10 +119,12 @@ export class PredictionQueue {
     }
 
     console.log("Initializing Redis connection...");
-    console.log(`Connecting to Redis at ${process.env.REDIS_URL}`);
+    console.log(
+      `Connecting to Redis at ${process.env.REDIS_HOST}:${process.env.REDIS_PORT}`
+    );
 
     this.instance = new PredictionQueue();
-    await this.queue.isReady();
+    await this.queue.waitUntilReady();
     console.log("Successfully connected to Redis!");
 
     // Log initial queue state
@@ -119,7 +142,7 @@ export class PredictionQueue {
       const jobs = await this.queue.getJobs(["waiting", "active"], 0, 10);
       console.log(
         "Current jobs in queue:",
-        jobs.map((job) => ({
+        jobs.map((job: BullMQJob<PredictionJob>) => ({
           id: job.id,
           data: job.data,
           timestamp: job.timestamp,
@@ -139,11 +162,8 @@ export class PredictionQueue {
       }
 
       // Ensure queue is ready
-      if (!this.queue.isReady()) {
-        console.log("Waiting for queue to be ready...");
-        await this.queue.isReady();
-        console.log("Queue is now ready");
-      }
+      await this.queue.waitUntilReady();
+      console.log("Queue is now ready");
 
       // Calculate delay until expiration
       const delay = prediction.expiresAt.getTime() - Date.now();
@@ -161,6 +181,7 @@ export class PredictionQueue {
 
       // Add job to queue with delay
       const job = await this.queue.add(
+        prediction.id, // Use prediction ID as job ID to prevent duplicates
         {
           id: prediction.id,
           tokenAddress: prediction.tokenAddress,
@@ -169,7 +190,6 @@ export class PredictionQueue {
         },
         {
           delay,
-          jobId: prediction.id, // Use prediction ID as job ID to prevent duplicates
         }
       );
 
@@ -198,7 +218,7 @@ export class PredictionQueue {
 
   static async getFailedJobs() {
     const failedJobs = await this.queue.getFailed();
-    return failedJobs.map((job) => ({
+    return failedJobs.map((job: BullMQJob<PredictionJob>) => ({
       id: job.data.id,
       tokenAddress: job.data.tokenAddress,
       error: job.failedReason,
@@ -210,6 +230,15 @@ export class PredictionQueue {
     const job = await this.queue.getJob(jobId);
     if (job) {
       await job.retry();
+    }
+  }
+
+  static async close() {
+    if (this.worker) {
+      await this.worker.close();
+    }
+    if (this.queue) {
+      await this.queue.close();
     }
   }
 }
