@@ -13,6 +13,8 @@ const client = new Client({
   ],
 });
 
+export { client };
+
 const commandHandler = new CommandHandler();
 let isInitialized = false;
 
