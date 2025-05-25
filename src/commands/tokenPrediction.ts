@@ -8,6 +8,7 @@ import {
   StringSelectMenuBuilder,
   StringSelectMenuInteraction,
   EmbedBuilder,
+  TextChannel,
 } from "discord.js";
 import { Command } from "../types/Command";
 import { tokens } from "../data/tokens";
@@ -226,8 +227,69 @@ export const command: Command = {
                 direction: choice.toUpperCase() as "UP" | "DOWN",
                 expiresAt,
               })
-                .then((prediction) => {
+                .then(async (prediction) => {
                   console.log("Prediction created successfully:", prediction);
+                  // Stop the collector after successful prediction
+                  buttonCollector.stop();
+
+                  // Send public message in the predictions channel
+                  try {
+                    const predictionsChannel =
+                      (await interaction.guild?.channels.fetch(
+                        process.env.FEED_CHANNEL_ID || ""
+                      )) as TextChannel;
+                    if (predictionsChannel) {
+                      const publicEmbed = new EmbedBuilder()
+                        .setColor("#0099ff")
+                        .setTitle("New Token Prediction")
+                        .setDescription(
+                          `${interaction.user} has made a new prediction!`
+                        )
+                        .addFields(
+                          {
+                            name: "User",
+                            value: `${interaction.user.username}`,
+                            inline: true,
+                          },
+                          {
+                            name: "Token",
+                            value: selectedToken.name,
+                            inline: true,
+                          },
+                          {
+                            name: "Timeframe",
+                            value: timeframeLabel,
+                            inline: true,
+                          },
+                          {
+                            name: "Direction",
+                            value: choice.toUpperCase(),
+                            inline: true,
+                          },
+                          {
+                            name: "Expires",
+                            value: `<t:${Math.floor(
+                              expiresAt.getTime() / 1000
+                            )}:R>`,
+                            inline: true,
+                          },
+                          {
+                            name: "Points",
+                            value: `${user.points}`,
+                            inline: true,
+                          }
+                        )
+                        .setTimestamp()
+                        .setThumbnail(interaction.user.displayAvatarURL());
+
+                      await predictionsChannel.send({ embeds: [publicEmbed] });
+                    }
+                  } catch (error) {
+                    console.error(
+                      "Error sending public prediction message:",
+                      error
+                    );
+                  }
                 })
                 .catch((error) => {
                   console.error("Error creating prediction:", error);
