@@ -25,17 +25,18 @@ model User {
 }
 
 model Prediction {
-  id           String   @id @default(uuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id])
-  tokenAddress String
-  tokenName    String
-  timeframe    String
-  direction    String // "UP" or "DOWN"
-  createdAt    DateTime @default(now())
-  expiresAt    DateTime
-  isResolved   Boolean  @default(false)
-  isWon        Boolean?
-  priceAtStart Float?
-  priceAtEnd   Float?
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  tokenAddress  String
+  tokenName     String
+  timeframe     String
+  direction     String // "UP" or "DOWN"
+  pointsWagered Int // Points wagered by the user
+  createdAt     DateTime @default(now())
+  expiresAt     DateTime
+  isResolved    Boolean  @default(false)
+  isWon         Boolean?
+  priceAtStart  Float?
+  priceAtEnd    Float?
 }
