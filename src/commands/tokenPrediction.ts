@@ -195,16 +195,6 @@ export const command: Command = {
               Date.now() + timeframes[timeframe as keyof typeof timeframes]
             );
 
-            // Save prediction to database
-            await PredictionService.createPrediction({
-              userId: interaction.user.id,
-              tokenAddress: selectedToken.tokenAddress,
-              tokenName: selectedToken.name,
-              timeframe,
-              direction: choice.toUpperCase() as "UP" | "DOWN",
-              expiresAt,
-            });
-
             // Create success embed
             const successEmbed = new EmbedBuilder()
               .setColor("#00ff00")
@@ -217,10 +207,23 @@ export const command: Command = {
               )
               .setFooter({ text: "Good luck!" });
 
-            await buttonInteraction.update({
-              embeds: [successEmbed],
-              components: [],
-            });
+            // Execute both operations in parallel
+            await Promise.all([
+              // Send confirmation message
+              buttonInteraction.update({
+                embeds: [successEmbed],
+                components: [],
+              }),
+              // Create prediction
+              PredictionService.createPrediction({
+                userId: interaction.user.id,
+                tokenAddress: selectedToken.tokenAddress,
+                tokenName: selectedToken.name,
+                timeframe,
+                direction: choice.toUpperCase() as "UP" | "DOWN",
+                expiresAt,
+              }),
+            ]);
           } catch (error) {
             console.error("Error saving prediction:", error);
 

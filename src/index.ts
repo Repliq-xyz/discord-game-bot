@@ -1,5 +1,6 @@
 import { Client, GatewayIntentBits, Events } from "discord.js";
 import { CommandHandler } from "./handlers/commandHandler";
+import { PredictionQueue } from "./services/predictionQueue";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -31,8 +32,18 @@ setTimeout(async () => {
       // Log all registered commands
       const commands = commandHandler.getCommands();
       console.log("Registered commands:", Array.from(commands.keys()));
+
+      // Initialize prediction queue
+      await PredictionQueue.initialize();
+      console.log("Prediction queue initialized successfully!");
+
+      // Log queue stats every minute
+      setInterval(async () => {
+        const stats = await PredictionQueue.getQueueStats();
+        console.log("Queue stats:", stats);
+      }, 60000);
     } catch (error) {
-      console.error("Error registering commands:", error);
+      console.error("Error during initialization:", error);
     }
   });
 
