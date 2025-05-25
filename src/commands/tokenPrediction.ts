@@ -14,6 +14,12 @@ import { tokens } from "../data/tokens";
 import { PredictionService } from "../services/predictionService";
 import { UserService } from "../services/userService";
 
+const timeframes = {
+  "1m": 60 * 1000, // 1 minute en millisecondes
+  "1h": 60 * 60 * 1000, // 1 heure en millisecondes
+  "1d": 24 * 60 * 60 * 1000, // 1 jour en millisecondes
+};
+
 export const command: Command = {
   data: new SlashCommandBuilder()
     .setName("token-prediction")
@@ -184,13 +190,19 @@ export const command: Command = {
           const choice = buttonInteraction.customId;
 
           try {
+            // Calculate expiration date based on timeframe
+            const expiresAt = new Date(
+              Date.now() + timeframes[timeframe as keyof typeof timeframes]
+            );
+
             // Save prediction to database
             await PredictionService.createPrediction({
               userId: interaction.user.id,
               tokenAddress: selectedToken.tokenAddress,
               tokenName: selectedToken.name,
               timeframe,
-              direction: choice.toUpperCase(),
+              direction: choice.toUpperCase() as "UP" | "DOWN",
+              expiresAt,
             });
 
             // Create success embed
