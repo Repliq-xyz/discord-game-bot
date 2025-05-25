@@ -18,23 +18,24 @@ export class PredictionQueue {
     try {
       console.log("Creating new queue instance...");
       // Create a new queue
-      PredictionQueue.queue = new Queue("prediction-queue", {
-        redis: {
-          host: process.env.REDIS_HOST,
-          port: parseInt(process.env.REDIS_PORT || "6379"),
-          password: process.env.REDIS_PASSWORD,
-          tls: {}, // Enable TLS for Railway Redis
-        },
-        defaultJobOptions: {
-          attempts: 3,
-          backoff: {
-            type: "exponential",
-            delay: 1000,
+      PredictionQueue.queue = new Queue(
+        "prediction-queue",
+        process.env.REDIS_URL!,
+        {
+          defaultJobOptions: {
+            attempts: 3,
+            backoff: {
+              type: "exponential",
+              delay: 1000,
+            },
+            removeOnComplete: true,
+            removeOnFail: false,
           },
-          removeOnComplete: true,
-          removeOnFail: false,
-        },
-      });
+          redis: {
+            tls: {}, // Enable TLS for Railway Redis
+          },
+        }
+      );
 
       console.log("Queue instance created, setting up processors...");
 
@@ -97,9 +98,7 @@ export class PredictionQueue {
     }
 
     console.log("Initializing Redis connection...");
-    console.log(
-      `Connecting to Redis at ${process.env.REDIS_HOST}:${process.env.REDIS_PORT}`
-    );
+    console.log(`Connecting to Redis at ${process.env.REDIS_URL}`);
 
     this.instance = new PredictionQueue();
     await this.queue.isReady();
