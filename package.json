@@ -6,11 +6,11 @@
   "scripts": {
     "start": "NODE_ENV=production node dist/index.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "prebuild": "prisma generate",
+    "prebuild": "prisma generate --schema=./prisma/schema.prisma --generator=client",
     "build": "tsc",
-    "postbuild": "prisma generate",
+    "postbuild": "prisma generate --schema=./prisma/schema.prisma --generator=client",
     "test": "jest",
-    "prisma:generate": "prisma generate",
+    "prisma:generate": "prisma generate --schema=./prisma/schema.prisma --generator=client",
     "prisma:push": "prisma db push",
     "prisma:migrate": "prisma migrate dev --name",
     "prisma:studio": "prisma studio",
@@ -18,7 +18,7 @@
     "db:setup": "npm run prisma:generate && npm run prisma:push",
     "db:migrate": "npm run prisma:generate && npm run prisma:migrate",
     "db:reset": "npm run prisma:reset",
-    "railway:start": "NODE_ENV=production prisma generate && NODE_ENV=production node dist/index.js"
+    "railway:start": "NODE_ENV=production prisma generate --schema=./prisma/schema.prisma --generator=client && NODE_ENV=production node dist/index.js"
   },
   "keywords": [],
   "author": "",
