@@ -11,18 +11,39 @@ export class CommandHandler {
   }
 
   private async loadCommands() {
-    const commandsPath = path.join(__dirname, "../commands");
-    const commandFiles = fs
-      .readdirSync(commandsPath)
-      .filter((file) => file.endsWith(".ts"));
+    try {
+      const commandsPath = path.join(__dirname, "../commands");
+      console.log("Loading commands from:", commandsPath);
 
-    for (const file of commandFiles) {
-      const filePath = path.join(commandsPath, file);
-      const { command } = await import(filePath);
+      const commandFiles = fs
+        .readdirSync(commandsPath)
+        .filter((file) => file.endsWith(".ts") || file.endsWith(".js"));
 
-      if ("data" in command && "execute" in command) {
-        this.commands.set(command.data.name, command);
+      console.log("Found command files:", commandFiles);
+
+      for (const file of commandFiles) {
+        try {
+          const filePath = path.join(commandsPath, file);
+          console.log("Loading command from:", filePath);
+
+          const { command } = await import(filePath);
+
+          if ("data" in command && "execute" in command) {
+            this.commands.set(command.data.name, command);
+            console.log(`Successfully loaded command: ${command.data.name}`);
+          } else {
+            console.warn(
+              `The command at ${filePath} is missing a required "data" or "execute" property.`
+            );
+          }
+        } catch (error) {
+          console.error(`Error loading command from ${file}:`, error);
+        }
       }
+
+      console.log("All commands loaded. Total commands:", this.commands.size);
+    } catch (error) {
+      console.error("Error loading commands:", error);
     }
   }
 
@@ -31,15 +52,20 @@ export class CommandHandler {
     const commands = this.commands.map((command) => command.data.toJSON());
 
     try {
-      console.log("Début de l'enregistrement des commandes slash...");
+      console.log("Starting slash commands registration...");
+      console.log(
+        "Registering commands:",
+        commands.map((cmd) => cmd.name)
+      );
 
       await rest.put(Routes.applicationGuildCommands(clientId, guildId), {
         body: commands,
       });
 
-      console.log("Commandes slash enregistrées avec succès!");
+      console.log("Slash commands registered successfully!");
     } catch (error) {
-      console.error(error);
+      console.error("Error registering commands:", error);
+      throw error;
     }
   }
 
