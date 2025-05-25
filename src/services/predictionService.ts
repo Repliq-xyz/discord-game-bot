@@ -35,10 +35,29 @@ export class PredictionService {
     });
     console.log("Created prediction in database:", prediction);
 
-    // Add to processing queue
-    console.log("Adding prediction to queue:", prediction.id);
-    await PredictionQueue.addPrediction(prediction);
-    console.log("Successfully added prediction to queue");
+    try {
+      // Add to processing queue
+      console.log("Adding prediction to queue:", prediction.id);
+      const job = await PredictionQueue.addPrediction(prediction);
+      if (job) {
+        console.log("Successfully added prediction to queue:", {
+          predictionId: prediction.id,
+          jobId: job.id,
+        });
+      } else {
+        console.warn(
+          "Prediction was not added to queue (possibly expired):",
+          prediction.id
+        );
+      }
+    } catch (error) {
+      console.error("Failed to add prediction to queue:", {
+        predictionId: prediction.id,
+        error: error instanceof Error ? error.message : error,
+      });
+      // We don't throw here because the prediction is already created in the database
+      // The queue will be retried on the next bot restart
+    }
 
     return prediction;
   }

@@ -111,30 +111,52 @@ export class PredictionQueue {
   }
 
   static async addPrediction(prediction: Prediction) {
-    // Calculate delay until expiration
-    const delay = prediction.expiresAt.getTime() - Date.now();
-    if (delay < 0) {
-      console.warn(`Prediction ${prediction.id} has already expired`);
-      return;
-    }
-
-    // Add job to queue with delay
-    await this.queue.add(
-      {
-        id: prediction.id,
-        tokenAddress: prediction.tokenAddress,
-        expiresAt: prediction.expiresAt,
-        priceAtStart: prediction.priceAtStart || undefined, // Convert null to undefined
-      },
-      {
+    try {
+      // Calculate delay until expiration
+      const delay = prediction.expiresAt.getTime() - Date.now();
+      console.log("Calculated delay for prediction:", {
+        predictionId: prediction.id,
         delay,
-        jobId: prediction.id, // Use prediction ID as job ID to prevent duplicates
-      }
-    );
+        expiresAt: prediction.expiresAt,
+        now: new Date(),
+      });
 
-    console.log(
-      `Added prediction ${prediction.id} to queue with delay ${delay}ms`
-    );
+      if (delay < 0) {
+        console.warn(`Prediction ${prediction.id} has already expired`);
+        return;
+      }
+
+      // Add job to queue with delay
+      const job = await this.queue.add(
+        {
+          id: prediction.id,
+          tokenAddress: prediction.tokenAddress,
+          expiresAt: prediction.expiresAt,
+          priceAtStart: prediction.priceAtStart || undefined,
+        },
+        {
+          delay,
+          jobId: prediction.id, // Use prediction ID as job ID to prevent duplicates
+        }
+      );
+
+      console.log(
+        `Added prediction ${prediction.id} to queue with delay ${delay}ms. Job ID: ${job.id}`
+      );
+
+      // Verify job was added
+      const jobCounts = await this.queue.getJobCounts();
+      console.log("Current queue state after adding job:", jobCounts);
+
+      return job;
+    } catch (error) {
+      console.error("Error adding prediction to queue:", {
+        predictionId: prediction.id,
+        error: error instanceof Error ? error.message : error,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw error; // Re-throw to be handled by the caller
+    }
   }
 
   static async getQueueStats() {
