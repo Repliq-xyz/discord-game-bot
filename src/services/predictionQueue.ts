@@ -74,6 +74,16 @@ export class PredictionQueue {
         );
       });
 
+      // Handle stalled jobs
+      PredictionQueue.queue.on("stalled", (job) => {
+        console.warn(`Job ${job.id} stalled for prediction ${job.data.id}`);
+      });
+
+      // Handle error events
+      PredictionQueue.queue.on("error", (error) => {
+        console.error("Queue error:", error);
+      });
+
       console.log("Queue processors set up successfully");
     } catch (error) {
       console.error("Error creating queue instance:", error);
@@ -127,6 +137,13 @@ export class PredictionQueue {
       if (!this.queue) {
         console.log("Queue not initialized, initializing now...");
         await this.initialize();
+      }
+
+      // Ensure queue is ready
+      if (!this.queue.isReady()) {
+        console.log("Waiting for queue to be ready...");
+        await this.queue.isReady();
+        console.log("Queue is now ready");
       }
 
       // Calculate delay until expiration
