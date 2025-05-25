@@ -4,7 +4,7 @@
   "description": "Discord bot for games",
   "main": "dist/index.js",
   "scripts": {
-    "start": "node -r @prisma/client/runtime dist/index.js",
+    "start": "node dist/index.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
     "postbuild": "prisma generate",
@@ -17,7 +17,7 @@
     "db:setup": "npm run prisma:generate && npm run prisma:push",
     "db:migrate": "npm run prisma:generate && npm run prisma:migrate",
     "db:reset": "npm run prisma:reset",
-    "railway:start": "prisma generate && node -r @prisma/client/runtime dist/index.js"
+    "railway:start": "prisma generate && node dist/index.js"
   },
   "keywords": [],
   "author": "",
