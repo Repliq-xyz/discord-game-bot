@@ -180,10 +180,12 @@ export const command: Command = {
         "collect",
         async (buttonInteraction: ButtonInteraction) => {
           if (buttonInteraction.user.id !== interaction.user.id) {
-            await buttonInteraction.reply({
-              content: "It's not your turn!",
-              ephemeral: true,
-            });
+            if (!buttonInteraction.replied && !buttonInteraction.deferred) {
+              await buttonInteraction.reply({
+                content: "It's not your turn!",
+                ephemeral: true,
+              });
+            }
             return;
           }
 
@@ -236,10 +238,12 @@ export const command: Command = {
               )
               .setFooter({ text: "If the problem persists, contact support" });
 
-            await buttonInteraction.update({
-              embeds: [errorEmbed],
-              components: [],
-            });
+            if (!buttonInteraction.replied && !buttonInteraction.deferred) {
+              await buttonInteraction.update({
+                embeds: [errorEmbed],
+                components: [],
+              });
+            }
           }
         }
       );
