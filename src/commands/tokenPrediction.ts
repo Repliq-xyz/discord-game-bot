@@ -7,6 +7,7 @@ import {
   ButtonInteraction,
   StringSelectMenuBuilder,
   StringSelectMenuInteraction,
+  EmbedBuilder,
 } from "discord.js";
 import { Command } from "../types/Command";
 import { tokens } from "../data/tokens";
@@ -15,12 +16,12 @@ import { UserService } from "../services/userService";
 
 export const command: Command = {
   data: new SlashCommandBuilder()
-    .setName("select-token")
-    .setDescription("Select a token for the game")
+    .setName("token-prediction")
+    .setDescription("Make a price prediction for a token")
     .addStringOption((option) =>
       option
         .setName("token")
-        .setDescription("The token to select")
+        .setDescription("The token to predict")
         .setRequired(true)
         .addChoices(
           ...tokens.map((token) => ({
@@ -34,7 +35,7 @@ export const command: Command = {
     if (!interaction.isChatInputCommand()) return;
 
     // Create or update user
-    await UserService.getOrCreateUser({
+    const user = await UserService.getOrCreateUser({
       id: interaction.user.id,
       username: interaction.user.username,
     });
@@ -85,9 +86,24 @@ export const command: Command = {
           ])
       );
 
+    // Create embed for token selection
+    const tokenEmbed = new EmbedBuilder()
+      .setColor("#0099ff")
+      .setTitle("Token Selection")
+      .setDescription(`You selected ${selectedToken.name}`)
+      .addFields(
+        {
+          name: "Token Address",
+          value: selectedToken.tokenAddress,
+          inline: false,
+        },
+        { name: "Your Points", value: `${user.points}`, inline: true }
+      )
+      .setFooter({ text: "Choose your timeframe below" });
+
     // Send message with timeframe selection
     const response = await interaction.reply({
-      content: `You selected token ${selectedToken.name} (${selectedToken.tokenAddress}).\nChoose your timeframe:`,
+      embeds: [tokenEmbed],
       components: [timeframeRow],
       ephemeral: true,
     });
@@ -130,9 +146,20 @@ export const command: Command = {
           .setStyle(ButtonStyle.Danger)
       );
 
+      // Create embed for prediction
+      const predictionEmbed = new EmbedBuilder()
+        .setColor("#0099ff")
+        .setTitle("Make Your Prediction")
+        .setDescription(`Token: ${selectedToken.name}`)
+        .addFields(
+          { name: "Timeframe", value: timeframeLabel, inline: true },
+          { name: "Your Points", value: `${user.points}`, inline: true }
+        )
+        .setFooter({ text: "Choose UP or DOWN for your prediction" });
+
       // Update message with buttons
       await i.update({
-        content: `Token: ${selectedToken.name}\nTimeframe: ${timeframeLabel}\nChoose your prediction:`,
+        embeds: [predictionEmbed],
         components: [buttonRow],
       });
 
@@ -166,16 +193,36 @@ export const command: Command = {
               direction: choice.toUpperCase(),
             });
 
+            // Create success embed
+            const successEmbed = new EmbedBuilder()
+              .setColor("#00ff00")
+              .setTitle("Prediction Registered!")
+              .setDescription(`Your prediction has been saved successfully`)
+              .addFields(
+                { name: "Token", value: selectedToken.name, inline: true },
+                { name: "Timeframe", value: timeframeLabel, inline: true },
+                { name: "Direction", value: choice.toUpperCase(), inline: true }
+              )
+              .setFooter({ text: "Good luck!" });
+
             await buttonInteraction.update({
-              content: `Prediction registered!\nToken: ${
-                selectedToken.name
-              }\nTimeframe: ${timeframeLabel}\nDirection: ${choice.toUpperCase()}`,
+              embeds: [successEmbed],
               components: [],
             });
           } catch (error) {
             console.error("Error saving prediction:", error);
+
+            // Create error embed
+            const errorEmbed = new EmbedBuilder()
+              .setColor("#ff0000")
+              .setTitle("Error")
+              .setDescription(
+                "Failed to save your prediction. Please try again."
+              )
+              .setFooter({ text: "If the problem persists, contact support" });
+
             await buttonInteraction.update({
-              content: "Error saving your prediction. Please try again.",
+              embeds: [errorEmbed],
               components: [],
             });
           }
@@ -184,8 +231,16 @@ export const command: Command = {
 
       buttonCollector.on("end", (collected) => {
         if (collected.size === 0) {
+          const timeoutEmbed = new EmbedBuilder()
+            .setColor("#ff9900")
+            .setTitle("Time's Up!")
+            .setDescription("No prediction was made within the time limit.")
+            .setFooter({
+              text: "Use the command again to make a new prediction",
+            });
+
           interaction.editReply({
-            content: "Time's up! No prediction was made.",
+            embeds: [timeoutEmbed],
             components: [],
           });
         }
@@ -194,8 +249,16 @@ export const command: Command = {
 
     timeframeCollector.on("end", (collected) => {
       if (collected.size === 0) {
+        const timeoutEmbed = new EmbedBuilder()
+          .setColor("#ff9900")
+          .setTitle("Time's Up!")
+          .setDescription("No timeframe was selected within the time limit.")
+          .setFooter({
+            text: "Use the command again to make a new prediction",
+          });
+
         interaction.editReply({
-          content: "Time's up! No timeframe was selected.",
+          embeds: [timeoutEmbed],
           components: [],
         });
       }

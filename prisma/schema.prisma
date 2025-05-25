@@ -15,12 +15,13 @@ datasource db {
 }
 
 model User {
-  id          String       @id
-  username    String
-  points      Int          @default(1000) // Starting points
-  predictions Prediction[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id             String       @id
+  username       String
+  points         Int          @default(1000) // Starting points
+  predictions    Prediction[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  lastDailyClaim DateTime? // Last time the user claimed daily points
 }
 
 model Prediction {
