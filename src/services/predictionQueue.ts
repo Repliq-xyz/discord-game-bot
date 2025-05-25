@@ -32,7 +32,6 @@ export class PredictionQueue {
           port: Number(url.port),
           username: url.username,
           password: url.password,
-          tls: {}, // Enable TLS for Railway Redis
         },
         defaultJobOptions: {
           attempts: 3,
@@ -78,18 +77,14 @@ export class PredictionQueue {
             port: Number(url.port),
             username: url.username,
             password: url.password,
-            tls: {}, // Enable TLS for Railway Redis
           },
         }
       );
 
       // Handle completed jobs
-      PredictionQueue.worker.on(
-        "completed",
-        (job: Job<PredictionJob>, result: any) => {
-          console.log(`Job ${job.id} completed for prediction ${job.data.id}`);
-        }
-      );
+      PredictionQueue.worker.on("completed", (job: Job<PredictionJob>) => {
+        console.log(`Job ${job.id} completed for prediction ${job.data.id}`);
+      });
 
       // Handle failed jobs
       PredictionQueue.worker.on(
