@@ -15,59 +15,70 @@ export class PredictionQueue {
   private static instance: PredictionQueue | null = null;
 
   private constructor() {
-    // Create a new queue
-    PredictionQueue.queue = new Queue("prediction-queue", {
-      redis: {
-        host: process.env.REDIS_HOST,
-        port: parseInt(process.env.REDIS_PORT || "6379"),
-        password: process.env.REDIS_PASSWORD,
-        tls: {}, // Enable TLS for Railway Redis
-      },
-      defaultJobOptions: {
-        attempts: 3,
-        backoff: {
-          type: "exponential",
-          delay: 1000,
+    try {
+      console.log("Creating new queue instance...");
+      // Create a new queue
+      PredictionQueue.queue = new Queue("prediction-queue", {
+        redis: {
+          host: process.env.REDIS_HOST,
+          port: parseInt(process.env.REDIS_PORT || "6379"),
+          password: process.env.REDIS_PASSWORD,
+          tls: {}, // Enable TLS for Railway Redis
         },
-        removeOnComplete: true,
-        removeOnFail: false,
-      },
-    });
+        defaultJobOptions: {
+          attempts: 3,
+          backoff: {
+            type: "exponential",
+            delay: 1000,
+          },
+          removeOnComplete: true,
+          removeOnFail: false,
+        },
+      });
 
-    // Process jobs
-    PredictionQueue.queue.process(async (job) => {
-      const { id, tokenAddress, priceAtStart } = job.data;
+      console.log("Queue instance created, setting up processors...");
 
-      try {
-        const currentPrice = await TokenService.getTokenPrice(tokenAddress);
-        if (currentPrice === undefined) {
-          throw new Error(`Could not get price for token ${tokenAddress}`);
+      // Process jobs
+      PredictionQueue.queue.process(async (job) => {
+        console.log(`Processing job ${job.id} for prediction ${job.data.id}`);
+        const { id, tokenAddress, priceAtStart } = job.data;
+
+        try {
+          const currentPrice = await TokenService.getTokenPrice(tokenAddress);
+          if (currentPrice === undefined) {
+            throw new Error(`Could not get price for token ${tokenAddress}`);
+          }
+
+          await PredictionService.resolvePrediction(
+            id,
+            currentPrice,
+            priceAtStart || currentPrice // Use current price as fallback
+          );
+          console.log(`Successfully processed prediction ${id}`);
+        } catch (error) {
+          console.error(`Error processing prediction ${id}:`, error);
+          throw error; // This will trigger a retry
         }
+      });
 
-        await PredictionService.resolvePrediction(
-          id,
-          currentPrice,
-          priceAtStart || currentPrice // Use current price as fallback
+      // Handle completed jobs
+      PredictionQueue.queue.on("completed", (job) => {
+        console.log(`Job ${job.id} completed for prediction ${job.data.id}`);
+      });
+
+      // Handle failed jobs
+      PredictionQueue.queue.on("failed", (job, error) => {
+        console.error(
+          `Job ${job?.id} failed for prediction ${job?.data.id}:`,
+          error
         );
-        console.log(`Successfully processed prediction ${id}`);
-      } catch (error) {
-        console.error(`Error processing prediction ${id}:`, error);
-        throw error; // This will trigger a retry
-      }
-    });
+      });
 
-    // Handle completed jobs
-    PredictionQueue.queue.on("completed", (job) => {
-      console.log(`Job ${job.id} completed for prediction ${job.data.id}`);
-    });
-
-    // Handle failed jobs
-    PredictionQueue.queue.on("failed", (job, error) => {
-      console.error(
-        `Job ${job?.id} failed for prediction ${job?.data.id}:`,
-        error
-      );
-    });
+      console.log("Queue processors set up successfully");
+    } catch (error) {
+      console.error("Error creating queue instance:", error);
+      throw error;
+    }
   }
 
   static async initialize() {
@@ -112,6 +123,12 @@ export class PredictionQueue {
 
   static async addPrediction(prediction: Prediction) {
     try {
+      // Ensure queue is initialized
+      if (!this.queue) {
+        console.log("Queue not initialized, initializing now...");
+        await this.initialize();
+      }
+
       // Calculate delay until expiration
       const delay = prediction.expiresAt.getTime() - Date.now();
       console.log("Calculated delay for prediction:", {
