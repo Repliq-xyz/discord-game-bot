@@ -18,12 +18,20 @@ export class PredictionQueue {
   private constructor() {
     try {
       console.log("Creating new queue instance...");
+
+      // Parse Redis URL
+      const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
+      const url = new URL(redisUrl);
+      console.log(`Parsed Redis URL: ${url.hostname}:${url.port}`);
+
       // Create a new queue
       PredictionQueue.queue = new Queue<PredictionJob>("prediction-queue", {
         connection: {
-          host: process.env.REDIS_HOST,
-          port: parseInt(process.env.REDIS_PORT || "6379"),
-          password: process.env.REDIS_PASSWORD,
+          family: 0,
+          host: url.hostname,
+          port: Number(url.port),
+          username: url.username,
+          password: url.password,
           tls: {}, // Enable TLS for Railway Redis
         },
         defaultJobOptions: {
@@ -65,9 +73,11 @@ export class PredictionQueue {
         },
         {
           connection: {
-            host: process.env.REDIS_HOST,
-            port: parseInt(process.env.REDIS_PORT || "6379"),
-            password: process.env.REDIS_PASSWORD,
+            family: 0,
+            host: url.hostname,
+            port: Number(url.port),
+            username: url.username,
+            password: url.password,
             tls: {}, // Enable TLS for Railway Redis
           },
         }
@@ -119,9 +129,9 @@ export class PredictionQueue {
     }
 
     console.log("Initializing Redis connection...");
-    console.log(
-      `Connecting to Redis at ${process.env.REDIS_HOST}:${process.env.REDIS_PORT}`
-    );
+    const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
+    const url = new URL(redisUrl);
+    console.log(`Connecting to Redis at ${url.hostname}:${url.port}`);
 
     this.instance = new PredictionQueue();
     await this.queue.waitUntilReady();
