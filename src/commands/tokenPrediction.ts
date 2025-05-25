@@ -196,6 +196,7 @@ export const command: Command = {
             const expiresAt = new Date(
               Date.now() + timeframes[timeframe as keyof typeof timeframes]
             );
+            console.log("Creating prediction with expiration:", expiresAt);
 
             // Create success embed
             const successEmbed = new EmbedBuilder()
@@ -224,7 +225,13 @@ export const command: Command = {
                 timeframe,
                 direction: choice.toUpperCase() as "UP" | "DOWN",
                 expiresAt,
-              }),
+              })
+                .then((prediction) => {
+                  console.log("Prediction created successfully:", prediction);
+                })
+                .catch((error) => {
+                  console.error("Error creating prediction:", error);
+                }),
             ]);
           } catch (error) {
             console.error("Error saving prediction:", error);

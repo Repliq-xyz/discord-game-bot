@@ -8,8 +8,18 @@ export class PredictionService {
   static async createPrediction(
     params: CreatePredictionParams
   ): Promise<Prediction> {
+    console.log("Creating prediction with params:", {
+      userId: params.userId,
+      tokenAddress: params.tokenAddress,
+      tokenName: params.tokenName,
+      timeframe: params.timeframe,
+      direction: params.direction,
+      expiresAt: params.expiresAt,
+    });
+
     // Get the current price of the token
     const priceAtStart = await TokenService.getTokenPrice(params.tokenAddress);
+    console.log("Got initial price:", priceAtStart);
 
     // Create the prediction with the start price
     const prediction = await prisma.prediction.create({
@@ -23,9 +33,12 @@ export class PredictionService {
         priceAtStart,
       },
     });
+    console.log("Created prediction in database:", prediction);
 
     // Add to processing queue
+    console.log("Adding prediction to queue:", prediction.id);
     await PredictionQueue.addPrediction(prediction);
+    console.log("Successfully added prediction to queue");
 
     return prediction;
   }
@@ -57,6 +70,12 @@ export class PredictionService {
     priceAtEnd: number,
     priceAtStart: number
   ): Promise<Prediction> {
+    console.log("Resolving prediction:", {
+      predictionId,
+      priceAtEnd,
+      priceAtStart,
+    });
+
     const prediction = await prisma.prediction.findUnique({
       where: { id: predictionId },
     });
@@ -67,6 +86,7 @@ export class PredictionService {
 
     // If the prediction is already resolved, don't process it again
     if (prediction.isResolved) {
+      console.log("Prediction already resolved:", predictionId);
       return prediction;
     }
 
@@ -76,12 +96,21 @@ export class PredictionService {
         : priceAtEnd < priceAtStart;
 
     const pointsToAdd = isWon ? 10 : -5;
+    console.log("Prediction result:", {
+      predictionId,
+      isWon,
+      pointsToAdd,
+      direction: prediction.direction,
+      priceAtStart,
+      priceAtEnd,
+    });
 
     // Update user points
     await UserService.updatePoints(prediction.userId, pointsToAdd);
+    console.log("Updated user points");
 
     // Update prediction
-    return prisma.prediction.update({
+    const updatedPrediction = await prisma.prediction.update({
       where: { id: predictionId },
       data: {
         isResolved: true,
@@ -90,5 +119,8 @@ export class PredictionService {
         priceAtEnd,
       },
     });
+    console.log("Updated prediction in database:", updatedPrediction);
+
+    return updatedPrediction;
   }
 }
