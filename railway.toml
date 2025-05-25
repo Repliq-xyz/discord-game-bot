@@ -3,6 +3,4 @@ builder = "nixpacks"
 buildCommand = "npm run prisma:generate && npm run build"
 
 [deploy]
-startCommand = "npm run railway:start"
-healthcheckPath = "/"
-healthcheckTimeout = 100 
+startCommand = "npm run railway:start" 
