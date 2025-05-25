@@ -30,7 +30,6 @@
   },
   "devDependencies": {
     "@types/node": "^20.11.19",
-    "@types/prisma": "^4.0.0",
     "prisma": "^6.8.2",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
