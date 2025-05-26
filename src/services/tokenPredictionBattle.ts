@@ -240,25 +240,47 @@ export class TokenPredictionBattle {
     loser: string;
     points: number;
   } | null> {
+    console.log(`Starting checkBattleResult for battle ${battleId}`);
     const job = await this.queue.getJob(`${this.BATTLE_PREFIX}${battleId}`);
-    if (!job) return null;
+    if (!job) {
+      console.log("No job found for battle:", battleId);
+      return null;
+    }
 
     const { battle, prices, startTime } = job.data;
+    console.log("Battle data:", {
+      battle,
+      prices,
+      startTime,
+    });
 
     if (!battle.joined || !battle.joinerToken) {
+      console.log("Battle not joined or missing joiner token:", {
+        joined: battle.joined,
+        hasJoinerToken: !!battle.joinerToken,
+      });
       return null;
     }
 
     const now = Date.now();
+    console.log("Time check:", {
+      now,
+      endTime: battle.endTime,
+      isEnded: now >= battle.endTime,
+    });
+
     if (now < battle.endTime) {
+      console.log("Battle not ended yet");
       return null;
     }
 
+    console.log("Getting final token prices...");
     // Get final prices
     const finalPrices = await this.getTokenPrices(
       battle.creatorToken,
       battle.joinerToken
     );
+    console.log("Final prices:", finalPrices);
 
     const creatorPerformance =
       ((finalPrices.creatorTokenPrice - prices.creatorTokenPrice) /
@@ -269,6 +291,15 @@ export class TokenPredictionBattle {
         prices.joinerTokenPrice) *
       100;
 
+    console.log("Performance calculations:", {
+      creatorPerformance,
+      joinerPerformance,
+      creatorStartPrice: prices.creatorTokenPrice,
+      creatorEndPrice: finalPrices.creatorTokenPrice,
+      joinerStartPrice: prices.joinerTokenPrice,
+      joinerEndPrice: finalPrices.joinerTokenPrice,
+    });
+
     let result = null;
     if (creatorPerformance > joinerPerformance) {
       result = {
@@ -276,15 +307,20 @@ export class TokenPredictionBattle {
         loser: battle.joinerId!,
         points: battle.points,
       };
+      console.log("Creator won:", result);
     } else if (joinerPerformance > creatorPerformance) {
       result = {
         winner: battle.joinerId!,
         loser: battle.creatorId,
         points: battle.points,
       };
+      console.log("Joiner won:", result);
+    } else {
+      console.log("Battle ended in a tie");
     }
 
     if (result) {
+      console.log("Sending result to feed channel...");
       // Send result to feed
       const feedChannel = await client.channels.fetch(
         process.env.FEED_CHANNEL_ID || ""
@@ -326,9 +362,13 @@ export class TokenPredictionBattle {
         };
 
         await textChannel.send({ embeds: [feedEmbed] });
+        console.log("Result sent to feed channel");
+      } else {
+        console.log("Feed channel not found or not text-based");
       }
     }
 
+    console.log("checkBattleResult completed with result:", result);
     return result;
   }
 

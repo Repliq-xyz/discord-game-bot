@@ -67,6 +67,7 @@ export class BattleQueue {
             const result = await TokenPredictionBattle.checkBattleResult(
               battleId
             );
+            console.log("Battle result:", result);
             if (result) {
               console.log("Battle result:", result);
               const battleJob = await TokenPredictionBattle.getJob(battleId);
