@@ -22,15 +22,24 @@ export class BattleQueue {
       const url = new URL(redisUrl);
       console.log(`Parsed Redis URL: ${url.hostname}:${url.port}`);
 
+      const connectionConfig = {
+        family: 0,
+        host: url.hostname,
+        port: Number(url.port),
+        username: url.username || undefined,
+        password: url.password || undefined,
+      };
+
+      console.log("Redis connection config:", {
+        host: connectionConfig.host,
+        port: connectionConfig.port,
+        hasUsername: !!connectionConfig.username,
+        hasPassword: !!connectionConfig.password,
+      });
+
       // Create a new queue
       BattleQueue.queue = new Queue<BattleJob>("battle-queue", {
-        connection: {
-          family: 0,
-          host: url.hostname,
-          port: Number(url.port),
-          username: url.username,
-          password: url.password,
-        },
+        connection: connectionConfig,
         defaultJobOptions: {
           attempts: 3,
           backoff: {
@@ -109,13 +118,7 @@ export class BattleQueue {
           }
         },
         {
-          connection: {
-            family: 0,
-            host: url.hostname,
-            port: Number(url.port),
-            username: url.username,
-            password: url.password,
-          },
+          connection: connectionConfig,
         }
       );
 
