@@ -96,8 +96,12 @@ export async function handleTokenSelect(
   interaction: StringSelectMenuInteraction
 ) {
   try {
+    console.log("Starting handleTokenSelect...");
     const battleId = interaction.message.reference?.messageId;
+    console.log("Battle ID from reference:", battleId);
+
     if (!battleId) {
+      console.log("No battle ID found in message reference");
       await interaction.reply({
         content: "Could not find the battle message!",
         ephemeral: true,
@@ -106,7 +110,10 @@ export async function handleTokenSelect(
     }
 
     const battle = await TokenPredictionBattle.getBattle(battleId);
+    console.log("Retrieved battle:", battle);
+
     if (!battle) {
+      console.log("Battle not found in database");
       await interaction.reply({
         content: "Battle not found!",
         ephemeral: true,
@@ -116,7 +123,10 @@ export async function handleTokenSelect(
 
     // Check if user has enough points
     const userPoints = await UserService.getUserPoints(interaction.user.id);
+    console.log("User points:", userPoints, "Required points:", battle.points);
+
     if (userPoints < battle.points) {
+      console.log("User doesn't have enough points");
       await interaction.reply({
         content: `You don't have enough points! You need ${battle.points} points to join this battle.`,
         ephemeral: true,
@@ -125,18 +135,28 @@ export async function handleTokenSelect(
     }
 
     const selectedToken = interaction.values[0];
+    console.log("Selected token:", selectedToken);
+
+    console.log("Attempting to join battle...");
     await TokenPredictionBattle.joinBattle(
       battleId,
       interaction.user.id,
       selectedToken
     );
+    console.log("Successfully called joinBattle");
 
     // Remove points from joiner
+    console.log("Removing points from joiner...");
     await UserService.updatePoints(interaction.user.id, -battle.points);
+    console.log("Points removed successfully");
 
     // Wait for battle update
+    console.log("Waiting for battle update...");
     const updatedBattle = await waitForBattleUpdate(battleId);
+    console.log("Updated battle:", updatedBattle);
+
     if (!updatedBattle) {
+      console.log("Battle update failed, returning points");
       // Return points if battle update failed
       await UserService.updatePoints(interaction.user.id, battle.points);
       await interaction.reply({
@@ -147,8 +167,12 @@ export async function handleTokenSelect(
     }
 
     // Get the original message to edit
+    console.log("Fetching battle channel:", battle.channelId);
     const channel = await client.channels.fetch(battle.channelId);
+    console.log("Channel fetched:", channel?.id);
+
     if (!channel?.isTextBased()) {
+      console.log("Channel is not text based");
       await interaction.reply({
         content: "Could not find the battle channel!",
         ephemeral: true,
@@ -157,8 +181,12 @@ export async function handleTokenSelect(
     }
 
     const textChannel = channel as TextChannel;
+    console.log("Fetching original message:", battleId);
     const originalMessage = await textChannel.messages.fetch(battleId);
+    console.log("Original message fetched:", originalMessage?.id);
+
     if (!originalMessage) {
+      console.log("Could not find original message");
       await interaction.reply({
         content: "Could not find the original message!",
         ephemeral: true,
@@ -167,6 +195,7 @@ export async function handleTokenSelect(
     }
 
     // Update battle message
+    console.log("Creating updated embed...");
     const updatedEmbed = new EmbedBuilder()
       .setColor("#0099ff")
       .setTitle("Token Prediction Battle")
@@ -193,17 +222,23 @@ export async function handleTokenSelect(
       )
       .setTimestamp();
 
+    console.log("Editing original message...");
     await originalMessage.edit({
       embeds: [updatedEmbed],
       components: [],
     });
+    console.log("Message edited successfully");
 
     // Send feed message
+    console.log("Fetching feed channel...");
     const feedChannel = await client.channels.fetch(
       process.env.FEED_CHANNEL_ID || ""
     );
+    console.log("Feed channel fetched:", feedChannel?.id);
+
     if (feedChannel?.isTextBased()) {
       const textChannel = feedChannel as TextChannel;
+      console.log("Creating feed embed...");
       const feedEmbed = new EmbedBuilder()
         .setColor("#00ff00")
         .setTitle("Battle Joined!")
@@ -230,18 +265,24 @@ export async function handleTokenSelect(
         )
         .setTimestamp();
 
+      console.log("Sending feed message...");
       await textChannel.send({ embeds: [feedEmbed] });
+      console.log("Feed message sent successfully");
     }
 
+    console.log("Sending success reply to user...");
     await interaction.reply({
       content: `You have joined the battle! ${battle.points} points have been deducted from your balance.`,
       ephemeral: true,
     });
 
     // Add battle check to queue
+    console.log("Adding battle check to queue...");
     await BattleQueue.addBattleCheck(battleId, battle.endTime - Date.now());
+    console.log("Battle check added to queue successfully");
   } catch (error: any) {
-    console.error("Error handling token select:", error);
+    console.error("Error in handleTokenSelect:", error);
+    console.error("Error stack:", error.stack);
     await interaction.reply({
       content: `Error joining battle: ${error.message}`,
       ephemeral: true,
