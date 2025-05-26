@@ -109,36 +109,6 @@ export const command: Command = {
         components: [row],
       });
 
-      // Send feed message
-      const feedChannel = interaction.guild?.channels.cache.get(
-        process.env.FEED_CHANNEL_ID as string
-      ) as TextChannel;
-
-      if (feedChannel) {
-        const feedEmbed = new EmbedBuilder()
-          .setColor("#0099ff")
-          .setTitle("New Token Battle Created")
-          .setDescription("A new battle has been created!")
-          .addFields(
-            {
-              name: "Creator",
-              value: `<@${interaction.user.id}>`,
-              inline: true,
-            },
-            {
-              name: "Token",
-              value:
-                tokens.find((t) => t.tokenAddress === token)?.name || token,
-              inline: true,
-            },
-            { name: "Timeframe", value: timeframe, inline: true },
-            { name: "Points", value: points.toString(), inline: true }
-          )
-          .setTimestamp();
-
-        await feedChannel.send({ embeds: [feedEmbed] });
-      }
-
       // Initialize battle
       await TokenPredictionBattle.initializeBattle(
         battleMessage.id,
