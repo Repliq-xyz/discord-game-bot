@@ -100,48 +100,47 @@ export class PermanentMessageService {
       )
       .setColor("#0099ff");
 
-    const rulesEmbed = new EmbedBuilder()
-      .setTitle("📜 Game Rules")
-      .setDescription("Here's how to play and earn points:\n\n")
-      .setColor("#0099ff")
-      .addFields(
-        {
-          name: "🚀 Getting Started",
-          value:
-            "1. Click the 'Start Game' button below\n2. You'll get access to your private channel\n3. All game commands can only be used in your private channel\n\n\n",
-          inline: false,
-        },
-        {
-          name: "🎯 Daily Points",
-          value:
-            "Use `/claim` to get your daily 20 points! This is your starting point for playing games.\n\n\n",
-          inline: false,
-        },
-        {
-          name: "📊 Token Prediction",
-          value:
-            "Use `/token-prediction [token]` to predict if a token's price will go up or down. Earn points based on your prediction accuracy!\n\n\n",
-          inline: false,
-        },
-        {
-          name: "⚔️ Token Prediction Battle",
-          value:
-            "Use `/token-prediction-battle` to challenge other players! Win battles to earn more points and climb the leaderboard.\n\n\n",
-          inline: false,
-        },
-        {
-          name: "🏆 Leaderboard",
-          value:
-            "Use `/points leaderboard` to see who's leading the game. Compete with other players to reach the top!\n\n\n",
-          inline: false,
-        },
-        {
-          name: "💡 Tips",
-          value:
-            "• Check your points anytime with `/points me`\n• Make predictions wisely to maximize your points\n• Come back daily to claim your points\n• Challenge other players in battles for more points\n• The more you play, the more points you can earn!",
-          inline: false,
-        }
-      );
+    const gettingStartedEmbed = new EmbedBuilder()
+      .setTitle("🚀 Getting Started")
+      .setDescription(
+        "1. Click the 'Start Game' button below\n2. You'll get access to your private channel\n3. All game commands can only be used in your private channel"
+      )
+      .setColor("#0099ff");
+
+    const dailyPointsEmbed = new EmbedBuilder()
+      .setTitle("🎯 Daily Points")
+      .setDescription(
+        "Use `/claim` to get your daily 20 points! This is your starting point for playing games."
+      )
+      .setColor("#0099ff");
+
+    const tokenPredictionEmbed = new EmbedBuilder()
+      .setTitle("📊 Token Prediction")
+      .setDescription(
+        "Use `/token-prediction [token]` to predict if a token's price will go up or down. Earn points based on your prediction accuracy!"
+      )
+      .setColor("#0099ff");
+
+    const battleEmbed = new EmbedBuilder()
+      .setTitle("⚔️ Token Prediction Battle")
+      .setDescription(
+        "Use `/token-prediction-battle` to challenge other players! Win battles to earn more points and climb the leaderboard."
+      )
+      .setColor("#0099ff");
+
+    const leaderboardEmbed = new EmbedBuilder()
+      .setTitle("🏆 Leaderboard")
+      .setDescription(
+        "Use `/points leaderboard` to see who's leading the game. Compete with other players to reach the top!"
+      )
+      .setColor("#0099ff");
+
+    const tipsEmbed = new EmbedBuilder()
+      .setTitle("💡 Tips")
+      .setDescription(
+        "• Check your points anytime with `/points me`\n• Make predictions wisely to maximize your points\n• Come back daily to claim your points\n• Challenge other players in battles for more points\n• The more you play, the more points you can earn!"
+      )
+      .setColor("#0099ff");
 
     const button = new ButtonBuilder()
       .setCustomId("start-game-button")
@@ -155,20 +154,44 @@ export class PermanentMessageService {
       try {
         const message = await channel.messages.fetch(messageId);
         await message.edit({
-          embeds: [welcomeEmbed, rulesEmbed],
+          embeds: [
+            welcomeEmbed,
+            gettingStartedEmbed,
+            dailyPointsEmbed,
+            tokenPredictionEmbed,
+            battleEmbed,
+            leaderboardEmbed,
+            tipsEmbed,
+          ],
           components: [row],
         });
       } catch {
         // If the message doesn't exist anymore, create a new one
         const newMessage = await channel.send({
-          embeds: [welcomeEmbed, rulesEmbed],
+          embeds: [
+            welcomeEmbed,
+            gettingStartedEmbed,
+            dailyPointsEmbed,
+            tokenPredictionEmbed,
+            battleEmbed,
+            leaderboardEmbed,
+            tipsEmbed,
+          ],
           components: [row],
         });
         await this.setMessageId(newMessage.id);
       }
     } else {
       const message = await channel.send({
-        embeds: [welcomeEmbed, rulesEmbed],
+        embeds: [
+          welcomeEmbed,
+          gettingStartedEmbed,
+          dailyPointsEmbed,
+          tokenPredictionEmbed,
+          battleEmbed,
+          leaderboardEmbed,
+          tipsEmbed,
+        ],
         components: [row],
       });
       await this.setMessageId(message.id);
