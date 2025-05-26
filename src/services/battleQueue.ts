@@ -66,7 +66,7 @@ export class BattleQueue {
             if (result) {
               const battleJob = await TokenPredictionBattle.getJob(battleId);
               if (battleJob) {
-                const { battle } = await battleJob.finished();
+                const battle = battleJob.data.battle;
                 const channel = await client.channels.fetch(battle.channelId);
                 if (channel?.isTextBased()) {
                   const textChannel = channel as TextChannel;
@@ -102,7 +102,7 @@ export class BattleQueue {
           } else if (type === "delete_unjoined") {
             const battleJob = await TokenPredictionBattle.getJob(battleId);
             if (battleJob) {
-              const { battle } = await battleJob.finished();
+              const battle = battleJob.data.battle;
               if (!battle.joined) {
                 const channel = await client.channels.fetch(battle.channelId);
                 if (channel?.isTextBased()) {

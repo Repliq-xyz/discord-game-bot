@@ -98,19 +98,29 @@ export async function handleTokenSelect(interaction: any) {
           name: "Creator's Token",
           value:
             tokens.find((t) => t.value === battle.creatorToken)?.name ||
-            battle.creatorToken,
+            battle.creatorToken ||
+            "Unknown",
           inline: true,
         },
-        { name: "Joiner", value: `<@${battle.joinerId}>`, inline: true },
+        {
+          name: "Joiner",
+          value: `<@${battle.joinerId || "Unknown"}>`,
+          inline: true,
+        },
         {
           name: "Joiner's Token",
           value:
             tokens.find((t) => t.value === battle.joinerToken)?.name ||
-            battle.joinerToken!,
+            battle.joinerToken ||
+            "Unknown",
           inline: true,
         },
-        { name: "Timeframe", value: battle.timeframe, inline: true },
-        { name: "Points", value: battle.points.toString(), inline: true }
+        {
+          name: "Timeframe",
+          value: battle.timeframe || "Unknown",
+          inline: true,
+        },
+        { name: "Points", value: (battle.points || 0).toString(), inline: true }
       )
       .setTimestamp();
 
