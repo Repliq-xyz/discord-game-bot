@@ -11,19 +11,41 @@ interface BattleJob {
 export class BattleQueue {
   private static queue: Queue<BattleJob>;
   private static worker: Worker<BattleJob>;
+  private static instance: BattleQueue | null = null;
 
-  static async initialize() {
-    if (!this.queue) {
-      this.queue = new Queue<BattleJob>("battle-queue", {
+  private constructor() {
+    try {
+      console.log("Creating new battle queue instance...");
+
+      // Parse Redis URL
+      const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
+      const url = new URL(redisUrl);
+      console.log(`Parsed Redis URL: ${url.hostname}:${url.port}`);
+
+      // Create a new queue
+      BattleQueue.queue = new Queue<BattleJob>("battle-queue", {
         connection: {
-          host: process.env.REDIS_HOST,
-          port: parseInt(process.env.REDIS_PORT || "6379"),
+          family: 0,
+          host: url.hostname,
+          port: Number(url.port),
+          username: url.username,
+          password: url.password,
+        },
+        defaultJobOptions: {
+          attempts: 3,
+          backoff: {
+            type: "exponential",
+            delay: 1000,
+          },
+          removeOnComplete: true,
+          removeOnFail: false,
         },
       });
-    }
 
-    if (!this.worker) {
-      this.worker = new Worker<BattleJob>(
+      console.log("Battle queue instance created, setting up worker...");
+
+      // Create worker to process jobs
+      BattleQueue.worker = new Worker<BattleJob>(
         "battle-queue",
         async (job) => {
           const { battleId, type } = job.data;
@@ -88,40 +110,154 @@ export class BattleQueue {
         },
         {
           connection: {
-            host: process.env.REDIS_HOST,
-            port: parseInt(process.env.REDIS_PORT || "6379"),
+            family: 0,
+            host: url.hostname,
+            port: Number(url.port),
+            username: url.username,
+            password: url.password,
           },
         }
       );
 
-      this.worker.on("completed", (job) => {
+      // Handle completed jobs
+      BattleQueue.worker.on("completed", (job) => {
         console.log(`Job ${job.id} completed for battle ${job.data.battleId}`);
       });
 
-      this.worker.on("failed", (job, error) => {
+      // Handle failed jobs
+      BattleQueue.worker.on("failed", (job, error) => {
         console.error(
           `Job ${job?.id} failed for battle ${job?.data.battleId}:`,
           error
         );
       });
+
+      // Handle stalled jobs
+      BattleQueue.worker.on("stalled", (jobId: string, prev: string) => {
+        console.warn(`Job ${jobId} stalled for battle ${prev}`);
+      });
+
+      // Handle error events
+      BattleQueue.worker.on("error", (error: Error) => {
+        console.error("Worker error:", error);
+      });
+
+      BattleQueue.queue.on("error", (error: Error) => {
+        console.error("Queue error:", error);
+      });
+
+      console.log("Battle worker set up successfully");
+    } catch (error) {
+      console.error("Error creating battle queue instance:", error);
+      throw error;
     }
   }
 
+  static async initialize() {
+    if (this.instance) {
+      return this.instance;
+    }
+
+    console.log("Initializing Redis connection for battle queue...");
+    const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
+    const url = new URL(redisUrl);
+    console.log(`Connecting to Redis at ${url.hostname}:${url.port}`);
+
+    this.instance = new BattleQueue();
+    await this.queue.waitUntilReady();
+    console.log("Successfully connected to Redis for battle queue!");
+
+    // Log initial queue state
+    const stats = await this.queue.getJobCounts();
+    console.log("Initial battle queue state:", {
+      waiting: stats.waiting,
+      active: stats.active,
+      completed: stats.completed,
+      failed: stats.failed,
+      delayed: stats.delayed,
+    });
+
+    return this.instance;
+  }
+
   static async addBattleCheck(battleId: string, delay: number) {
-    await this.initialize();
-    await this.queue.add(
-      "check_result",
-      { battleId, type: "check_result" },
-      { delay }
-    );
+    try {
+      // Ensure queue is initialized
+      if (!this.queue) {
+        console.log("Battle queue not initialized, initializing now...");
+        await this.initialize();
+      }
+
+      // Ensure queue is ready
+      await this.queue.waitUntilReady();
+      console.log("Battle queue is now ready");
+
+      // Add job to queue with delay
+      const job = await this.queue.add(
+        "check_result",
+        { battleId, type: "check_result" },
+        { delay }
+      );
+
+      console.log(
+        `Added battle check for ${battleId} to queue with delay ${delay}ms. Job ID: ${job.id}`
+      );
+
+      return job;
+    } catch (error) {
+      console.error("Error adding battle check to queue:", {
+        battleId,
+        error: error instanceof Error ? error.message : error,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw error;
+    }
   }
 
   static async addUnjoinedBattleDeletion(battleId: string, delay: number) {
-    await this.initialize();
-    await this.queue.add(
-      "delete_unjoined",
-      { battleId, type: "delete_unjoined" },
-      { delay }
-    );
+    try {
+      // Ensure queue is initialized
+      if (!this.queue) {
+        console.log("Battle queue not initialized, initializing now...");
+        await this.initialize();
+      }
+
+      // Ensure queue is ready
+      await this.queue.waitUntilReady();
+      console.log("Battle queue is now ready");
+
+      // Add job to queue with delay
+      const job = await this.queue.add(
+        "delete_unjoined",
+        { battleId, type: "delete_unjoined" },
+        { delay }
+      );
+
+      console.log(
+        `Added unjoined battle deletion for ${battleId} to queue with delay ${delay}ms. Job ID: ${job.id}`
+      );
+
+      return job;
+    } catch (error) {
+      console.error("Error adding unjoined battle deletion to queue:", {
+        battleId,
+        error: error instanceof Error ? error.message : error,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw error;
+    }
+  }
+
+  static async getQueueStats() {
+    return await this.queue.getJobCounts();
+  }
+
+  static async close() {
+    if (this.worker) {
+      await this.worker.close();
+    }
+    if (this.queue) {
+      await this.queue.close();
+    }
   }
 }
