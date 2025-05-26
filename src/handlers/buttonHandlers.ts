@@ -87,15 +87,28 @@ export async function handleTokenSelect(interaction: any) {
       return;
     }
 
+    const tokens = await TokenPredictionBattle.getAvailableTokens();
     const updatedEmbed = new EmbedBuilder()
       .setColor("#0099ff")
       .setTitle("Token Prediction Battle")
       .setDescription("Battle is in progress!")
       .addFields(
         { name: "Creator", value: `<@${battle.creatorId}>`, inline: true },
-        { name: "Creator's Token", value: battle.creatorToken, inline: true },
+        {
+          name: "Creator's Token",
+          value:
+            tokens.find((t) => t.value === battle.creatorToken)?.name ||
+            battle.creatorToken,
+          inline: true,
+        },
         { name: "Joiner", value: `<@${battle.joinerId}>`, inline: true },
-        { name: "Joiner's Token", value: battle.joinerToken!, inline: true },
+        {
+          name: "Joiner's Token",
+          value:
+            tokens.find((t) => t.value === battle.joinerToken)?.name ||
+            battle.joinerToken!,
+          inline: true,
+        },
         { name: "Timeframe", value: battle.timeframe, inline: true },
         { name: "Points", value: battle.points.toString(), inline: true }
       )

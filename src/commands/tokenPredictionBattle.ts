@@ -10,6 +10,7 @@ import {
 import { Command } from "../types/Command";
 import { TokenPredictionBattle } from "../services/tokenPredictionBattle";
 import { BattleQueue } from "../services/battleQueue";
+import { tokens } from "../data/tokens";
 
 // Fonction utilitaire pour calculer le temps de fin
 function calculateEndTime(startTime: number, timeframe: string): number {
@@ -68,7 +69,11 @@ export const command: Command = {
         .setDescription(`A new battle has been created!`)
         .addFields(
           { name: "Creator", value: interaction.user.toString(), inline: true },
-          { name: "Token", value: token, inline: true },
+          {
+            name: "Token",
+            value: tokens.find((t) => t.tokenAddress === token)?.name || token,
+            inline: true,
+          },
           { name: "Timeframe", value: timeframe, inline: true },
           { name: "Points", value: points.toString(), inline: true }
         )
