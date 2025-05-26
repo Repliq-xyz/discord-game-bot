@@ -102,37 +102,37 @@ export class PermanentMessageService {
 
     const rulesEmbed = new EmbedBuilder()
       .setTitle("📜 Game Rules")
-      .setDescription("Here's how to play and earn points:")
+      .setDescription("Here's how to play and earn points:\n\n")
       .setColor("#0099ff")
       .addFields(
         {
           name: "🚀 Getting Started",
           value:
-            "1. Click the 'Start Game' button below\n2. You'll get access to your private channel\n3. All game commands can only be used in your private channel\n\n",
+            "1. Click the 'Start Game' button below\n2. You'll get access to your private channel\n3. All game commands can only be used in your private channel\n\n\n",
           inline: false,
         },
         {
           name: "🎯 Daily Points",
           value:
-            "Use `/claim` to get your daily 20 points! This is your starting point for playing games.\n\n",
+            "Use `/claim` to get your daily 20 points! This is your starting point for playing games.\n\n\n",
           inline: false,
         },
         {
           name: "📊 Token Prediction",
           value:
-            "Use `/token-prediction [token]` to predict if a token's price will go up or down. Earn points based on your prediction accuracy!\n\n",
+            "Use `/token-prediction [token]` to predict if a token's price will go up or down. Earn points based on your prediction accuracy!\n\n\n",
           inline: false,
         },
         {
           name: "⚔️ Token Prediction Battle",
           value:
-            "Use `/token-prediction-battle` to challenge other players! Win battles to earn more points and climb the leaderboard.\n\n",
+            "Use `/token-prediction-battle` to challenge other players! Win battles to earn more points and climb the leaderboard.\n\n\n",
           inline: false,
         },
         {
           name: "🏆 Leaderboard",
           value:
-            "Use `/points leaderboard` to see who's leading the game. Compete with other players to reach the top!\n\n",
+            "Use `/points leaderboard` to see who's leading the game. Compete with other players to reach the top!\n\n\n",
           inline: false,
         },
         {
