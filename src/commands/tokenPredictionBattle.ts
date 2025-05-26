@@ -15,8 +15,19 @@ import { UserService } from "../services/userService";
 
 // Fonction utilitaire pour calculer le temps de fin
 function calculateEndTime(startTime: number, timeframe: string): number {
-  const hours = parseInt(timeframe);
-  return startTime + hours * 60 * 60 * 1000;
+  const value = parseInt(timeframe);
+  const unit = timeframe.slice(-1); // 'm' for minutes, 'h' for hours, 'd' for days
+
+  switch (unit) {
+    case "m":
+      return startTime + value * 60 * 1000;
+    case "h":
+      return startTime + value * 60 * 60 * 1000;
+    case "d":
+      return startTime + value * 24 * 60 * 60 * 1000;
+    default:
+      return startTime;
+  }
 }
 
 export const command: Command = {
@@ -36,6 +47,7 @@ export const command: Command = {
         .setDescription("The timeframe for the prediction")
         .setRequired(true)
         .addChoices(
+          { name: "5min", value: "5m" },
           { name: "1h", value: "1h" },
           { name: "4h", value: "4h" },
           { name: "1d", value: "1d" }
