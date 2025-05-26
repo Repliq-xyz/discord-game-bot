@@ -30,12 +30,25 @@ export async function handleJoinBattle(interaction: ButtonInteraction) {
       return;
     }
 
+    // Get available tokens excluding the creator's token
+    const availableTokens = TokenPredictionBattle.getAvailableTokens().filter(
+      (token) => token.value !== battle.creatorToken
+    );
+
+    if (availableTokens.length === 0) {
+      await interaction.reply({
+        content: "No available tokens to select!",
+        ephemeral: true,
+      });
+      return;
+    }
+
     // Create token selection menu
     const tokenSelect = new StringSelectMenuBuilder()
       .setCustomId("select_token")
       .setPlaceholder("Select your token")
       .addOptions(
-        TokenPredictionBattle.getAvailableTokens().map((token) =>
+        availableTokens.map((token) =>
           new StringSelectMenuOptionBuilder()
             .setLabel(token.name)
             .setValue(token.value)
