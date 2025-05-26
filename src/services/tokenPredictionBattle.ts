@@ -132,9 +132,13 @@ export class TokenPredictionBattle {
     joinerId: string,
     token: string
   ): Promise<void> {
+    console.log(
+      `Attempting to join battle ${battleId} for user ${joinerId} with token ${token}`
+    );
     await this.initialize();
 
     const battle = await this.getBattle(battleId);
+    console.log("Current battle state:", battle);
     if (!battle) {
       throw new Error("Battle not found");
     }
@@ -143,14 +147,17 @@ export class TokenPredictionBattle {
       throw new Error("Battle already has a joiner");
     }
 
+    console.log("Getting token prices...");
     // Get prices when someone joins
     const prices = await this.getTokenPrices(battle.creatorToken, token);
+    console.log("Token prices:", prices);
 
     // Update battle state
     battle.joined = true;
     battle.joinerId = joinerId;
     battle.joinerToken = token;
 
+    console.log("Updating battle state with:", battle);
     // Store updated battle with prices
     await this.queue.add(
       "update_battle",
@@ -165,11 +172,19 @@ export class TokenPredictionBattle {
       }
     );
 
+    console.log("Verifying battle update...");
     // Verify the update was successful
     const updatedBattle = await this.getBattle(battleId);
+    console.log("Updated battle state:", updatedBattle);
     if (!updatedBattle || !updatedBattle.joined) {
+      console.error("Battle update verification failed:", {
+        updatedBattle,
+        expectedJoined: true,
+        actualJoined: updatedBattle?.joined,
+      });
       throw new Error("Failed to update battle state");
     }
+    console.log("Battle update successful!");
   }
 
   private static async getTokenPrices(
