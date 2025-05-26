@@ -61,7 +61,7 @@ export async function handleJoinBattle(interaction: ButtonInteraction) {
 
 export async function handleTokenSelect(interaction: any) {
   try {
-    const battleId = interaction.message.reference?.messageId;
+    const battleId = interaction.message.id;
     if (!battleId) {
       await interaction.reply({
         content: "Could not find the battle message!",
