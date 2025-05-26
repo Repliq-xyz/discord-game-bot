@@ -60,6 +60,8 @@ export class BattleQueue {
         async (job) => {
           const { battleId, type } = job.data;
 
+          console.log("Battle type:", type);
+
           if (type === "check_result") {
             const result = await TokenPredictionBattle.checkBattleResult(
               battleId
@@ -110,7 +112,12 @@ export class BattleQueue {
             console.log("Checking if battle should be deleted...");
             const battleJob = await TokenPredictionBattle.getJob(battleId);
             if (battleJob) {
+              console.log(
+                "Battle job data:",
+                JSON.stringify(battleJob.data, null, 2)
+              );
               const battle = battleJob.data.battle;
+              console.log("Battle state:", battle);
               // Only delete if the battle hasn't been joined
               if (!battle.joined) {
                 console.log("Battle not joined, proceeding with deletion...");
@@ -129,6 +136,8 @@ export class BattleQueue {
               } else {
                 console.log("Battle has been joined, skipping deletion...");
               }
+            } else {
+              console.log("No battle job found for ID:", battleId);
             }
           }
         },
