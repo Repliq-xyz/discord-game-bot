@@ -262,18 +262,6 @@ export class TokenPredictionBattle {
       return null;
     }
 
-    const now = Date.now();
-    console.log("Time check:", {
-      now,
-      endTime: battle.endTime,
-      isEnded: now >= battle.endTime,
-    });
-
-    if (now < battle.endTime) {
-      console.log("Battle not ended yet");
-      return null;
-    }
-
     console.log("Getting final token prices...");
     // Get final prices
     const finalPrices = await this.getTokenPrices(
@@ -376,8 +364,19 @@ export class TokenPredictionBattle {
     startTime: number,
     timeframe: string
   ): number {
-    const hours = parseInt(timeframe);
-    return startTime + hours * 60 * 60 * 1000;
+    const value = parseInt(timeframe);
+    const unit = timeframe.slice(-1);
+
+    switch (unit) {
+      case "m":
+        return startTime + value * 60 * 1000; // minutes to milliseconds
+      case "h":
+        return startTime + value * 60 * 60 * 1000; // hours to milliseconds
+      case "d":
+        return startTime + value * 24 * 60 * 60 * 1000; // days to milliseconds
+      default:
+        return startTime + 5 * 60 * 1000; // default to 5 minutes
+    }
   }
 
   static getAvailableTokens() {
