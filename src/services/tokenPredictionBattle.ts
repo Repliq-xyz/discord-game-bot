@@ -3,6 +3,7 @@ import { TokenService } from "./tokenService";
 import { tokens } from "../data/tokens";
 import { client } from "../index";
 import { TextChannel } from "discord.js";
+import { UserService } from "./userService";
 
 interface Battle {
   id: string;
@@ -262,102 +263,139 @@ export class TokenPredictionBattle {
       return null;
     }
 
-    console.log("Getting final token prices...");
-    // Get final prices
-    const finalPrices = await this.getTokenPrices(
-      battle.creatorToken,
-      battle.joinerToken
-    );
-    console.log("Final prices:", finalPrices);
+    try {
+      console.log("Getting final token prices...");
+      // Get final prices
+      const finalPrices = await this.getTokenPrices(
+        battle.creatorToken,
+        battle.joinerToken
+      );
+      console.log("Final prices:", finalPrices);
 
-    const creatorPerformance =
-      ((finalPrices.creatorTokenPrice - prices.creatorTokenPrice) /
-        prices.creatorTokenPrice) *
-      100;
-    const joinerPerformance =
-      ((finalPrices.joinerTokenPrice - prices.joinerTokenPrice) /
-        prices.joinerTokenPrice) *
-      100;
+      const creatorPerformance =
+        ((finalPrices.creatorTokenPrice - prices.creatorTokenPrice) /
+          prices.creatorTokenPrice) *
+        100;
+      const joinerPerformance =
+        ((finalPrices.joinerTokenPrice - prices.joinerTokenPrice) /
+          prices.joinerTokenPrice) *
+        100;
 
-    console.log("Performance calculations:", {
-      creatorPerformance,
-      joinerPerformance,
-      creatorStartPrice: prices.creatorTokenPrice,
-      creatorEndPrice: finalPrices.creatorTokenPrice,
-      joinerStartPrice: prices.joinerTokenPrice,
-      joinerEndPrice: finalPrices.joinerTokenPrice,
-    });
+      console.log("Performance calculations:", {
+        creatorPerformance,
+        joinerPerformance,
+        creatorStartPrice: prices.creatorTokenPrice,
+        creatorEndPrice: finalPrices.creatorTokenPrice,
+        joinerStartPrice: prices.joinerTokenPrice,
+        joinerEndPrice: finalPrices.joinerTokenPrice,
+      });
 
-    let result = null;
-    if (creatorPerformance > joinerPerformance) {
-      result = {
-        winner: battle.creatorId,
-        loser: battle.joinerId!,
-        points: battle.points,
-      };
-      console.log("Creator won:", result);
-    } else if (joinerPerformance > creatorPerformance) {
-      result = {
-        winner: battle.joinerId!,
-        loser: battle.creatorId,
-        points: battle.points,
-      };
-      console.log("Joiner won:", result);
-    } else {
-      console.log("Battle ended in a tie");
-    }
+      let result = null;
+      if (creatorPerformance > joinerPerformance) {
+        result = {
+          winner: battle.creatorId,
+          loser: battle.joinerId!,
+          points: battle.points,
+        };
+        console.log("Creator won:", result);
+      } else if (joinerPerformance > creatorPerformance) {
+        result = {
+          winner: battle.joinerId!,
+          loser: battle.creatorId,
+          points: battle.points,
+        };
+        console.log("Joiner won:", result);
+      } else {
+        console.log("Battle ended in a tie");
+      }
 
-    if (result) {
-      console.log("Sending result to feed channel...");
-      // Send result to feed
+      if (result) {
+        console.log("Sending result to feed channel...");
+        // Send result to feed
+        const feedChannel = await client.channels.fetch(
+          process.env.FEED_CHANNEL_ID || ""
+        );
+        if (feedChannel?.isTextBased()) {
+          const textChannel = feedChannel as TextChannel;
+          const feedEmbed = {
+            color: 0x00ff00,
+            title: "Battle Result",
+            description: `Battle between <@${battle.creatorId}> and <@${battle.joinerId}> has ended!`,
+            fields: [
+              {
+                name: "Winner",
+                value: `<@${result.winner}>`,
+                inline: true,
+              },
+              {
+                name: "Points Won",
+                value: (result.points * 2).toString(),
+                inline: true,
+              },
+              {
+                name: "Loser",
+                value: `<@${result.loser}>`,
+                inline: true,
+              },
+              {
+                name: "Creator's Token Performance",
+                value: `${creatorPerformance.toFixed(2)}%`,
+                inline: true,
+              },
+              {
+                name: "Joiner's Token Performance",
+                value: `${joinerPerformance.toFixed(2)}%`,
+                inline: true,
+              },
+            ],
+            timestamp: new Date().toISOString(),
+          };
+
+          await textChannel.send({ embeds: [feedEmbed] });
+          console.log("Result sent to feed channel");
+        } else {
+          console.log("Feed channel not found or not text-based");
+        }
+      }
+
+      console.log("checkBattleResult completed with result:", result);
+      return result;
+    } catch (error) {
+      console.error("Error in checkBattleResult:", error);
+      // Return points to both users if check fails
+      console.log("Returning points to both users due to check failure");
+      await UserService.updatePoints(battle.creatorId, battle.points);
+      await UserService.updatePoints(battle.joinerId!, battle.points);
+
+      // Send error message to feed
       const feedChannel = await client.channels.fetch(
         process.env.FEED_CHANNEL_ID || ""
       );
       if (feedChannel?.isTextBased()) {
         const textChannel = feedChannel as TextChannel;
-        const feedEmbed = {
-          color: 0x00ff00,
-          title: "Battle Result",
-          description: `Battle between <@${battle.creatorId}> and <@${battle.joinerId}> has ended!`,
+        const errorEmbed = {
+          color: 0xff0000,
+          title: "Battle Error",
+          description: `Battle between <@${battle.creatorId}> and <@${battle.joinerId}> failed to complete!`,
           fields: [
             {
-              name: "Winner",
-              value: `<@${result.winner}>`,
+              name: "Status",
+              value: "Points have been returned to both participants",
               inline: true,
             },
             {
-              name: "Points Won",
-              value: (result.points * 2).toString(),
-              inline: true,
-            },
-            {
-              name: "Loser",
-              value: `<@${result.loser}>`,
-              inline: true,
-            },
-            {
-              name: "Creator's Token Performance",
-              value: `${creatorPerformance.toFixed(2)}%`,
-              inline: true,
-            },
-            {
-              name: "Joiner's Token Performance",
-              value: `${joinerPerformance.toFixed(2)}%`,
+              name: "Points Returned",
+              value: battle.points.toString(),
               inline: true,
             },
           ],
           timestamp: new Date().toISOString(),
         };
 
-        await textChannel.send({ embeds: [feedEmbed] });
-        console.log("Result sent to feed channel");
-      } else {
-        console.log("Feed channel not found or not text-based");
+        await textChannel.send({ embeds: [errorEmbed] });
       }
+      return null;
     }
-
-    console.log("checkBattleResult completed with result:", result);
-    return result;
   }
 
   private static calculateEndTime(
