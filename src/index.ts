@@ -1,6 +1,7 @@
 import { Client, GatewayIntentBits, Events } from "discord.js";
 import { CommandHandler } from "./handlers/commandHandler";
 import { PredictionQueue } from "./services/predictionQueue";
+import { handleJoinBattle, handleTokenSelect } from "./handlers/buttonHandlers";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -52,30 +53,41 @@ client.once(Events.ClientReady, async (readyClient) => {
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
-  if (!interaction.isChatInputCommand()) return;
+  if (interaction.isChatInputCommand()) {
+    const command = commandHandler.getCommands().get(interaction.commandName);
 
-  const command = commandHandler.getCommands().get(interaction.commandName);
+    if (!command) {
+      console.error(`No command ${interaction.commandName} was found.`);
+      return;
+    }
 
-  if (!command) {
-    console.error(`No command ${interaction.commandName} was found.`);
-    return;
-  }
-
-  try {
-    console.log(`Executing command: ${interaction.commandName}`);
-    await command.execute(interaction);
-  } catch (error) {
-    console.error(`Error executing command ${interaction.commandName}:`, error);
-    if (interaction.replied || interaction.deferred) {
-      await interaction.followUp({
-        content: "There was an error while executing this command!",
-        ephemeral: true,
-      });
-    } else {
-      await interaction.reply({
-        content: "There was an error while executing this command!",
-        ephemeral: true,
-      });
+    try {
+      console.log(`Executing command: ${interaction.commandName}`);
+      await command.execute(interaction);
+    } catch (error) {
+      console.error(
+        `Error executing command ${interaction.commandName}:`,
+        error
+      );
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({
+          content: "There was an error while executing this command!",
+          ephemeral: true,
+        });
+      } else {
+        await interaction.reply({
+          content: "There was an error while executing this command!",
+          ephemeral: true,
+        });
+      }
+    }
+  } else if (interaction.isButton()) {
+    if (interaction.customId === "join_battle") {
+      await handleJoinBattle(interaction);
+    }
+  } else if (interaction.isStringSelectMenu()) {
+    if (interaction.customId === "select_token") {
+      await handleTokenSelect(interaction);
     }
   }
 });
