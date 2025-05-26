@@ -16,7 +16,7 @@ import { PredictionService } from "../services/predictionService";
 import { UserService } from "../services/userService";
 
 const timeframes = {
-  "1m": 60 * 1000, // 1 minute en millisecondes
+  "5m": 5 * 60 * 1000, // 5 minutes en millisecondes
   "1h": 60 * 60 * 1000, // 1 heure en millisecondes
   "1d": 24 * 60 * 60 * 1000, // 1 jour en millisecondes
 };
@@ -76,9 +76,9 @@ export const command: Command = {
           .setPlaceholder("Choose a timeframe")
           .addOptions([
             {
-              label: "1 Minute",
-              description: "Prediction for 1 minute",
-              value: "1m",
+              label: "5 Minutes",
+              description: "Prediction for 5 minutes",
+              value: "5m",
             },
             {
               label: "1 Hour",
@@ -131,8 +131,8 @@ export const command: Command = {
       let timeframeLabel = "";
       let maxPoints = 0;
       switch (timeframe) {
-        case "1m":
-          timeframeLabel = "1 minute";
+        case "5m":
+          timeframeLabel = "5 minutes";
           maxPoints = 100;
           break;
         case "1h":
