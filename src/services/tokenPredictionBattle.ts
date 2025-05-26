@@ -181,13 +181,12 @@ export class TokenPredictionBattle {
     const job = await this.queue.getJob(`${this.BATTLE_PREFIX}${battleId}`);
     if (!job) return null;
 
-    const jobData = await job.getState();
-    if (jobData === "completed") {
+    const jobState = await job.getState();
+    if (jobState === "completed") {
       const result = await job.finished();
       return result.battle;
     } else {
-      const data = await job.getData();
-      return data.battle;
+      return job.data.battle;
     }
   }
 
