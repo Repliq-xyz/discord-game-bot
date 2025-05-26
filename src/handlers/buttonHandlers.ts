@@ -214,7 +214,7 @@ export async function handleTokenSelect(
           },
           {
             name: "Timeframe",
-            value: `${updatedBattle.timeframe} hours`,
+            value: `${updatedBattle.timeframe}`,
             inline: true,
           },
           {
@@ -273,9 +273,30 @@ export async function handleTokenSelect(
       }
 
       // Add battle check to queue
-      const delay = updatedBattle.endTime - Date.now();
+      const calculateDelay = (timeframe: string): number => {
+        const value = parseInt(timeframe);
+        const unit = timeframe.slice(-1);
+
+        switch (unit) {
+          case "m":
+            return value * 60 * 1000; // minutes to milliseconds
+          case "h":
+            return value * 60 * 60 * 1000; // hours to milliseconds
+          case "d":
+            return value * 24 * 60 * 60 * 1000; // days to milliseconds
+          default:
+            return 5 * 60 * 1000; // default to 5 minutes
+        }
+      };
+
+      const delay = calculateDelay(updatedBattle.timeframe);
       await BattleQueue.addBattleCheck(battleId, delay);
-      console.log("Added battle check to queue");
+      console.log(
+        "Added battle check to queue with delay:",
+        delay,
+        "ms for timeframe:",
+        updatedBattle.timeframe
+      );
 
       // Delete the token selection message
       try {

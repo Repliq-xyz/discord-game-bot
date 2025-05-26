@@ -63,10 +63,12 @@ export class BattleQueue {
           console.log("Battle type:", type);
 
           if (type === "check_result") {
+            console.log("Checking battle result...");
             const result = await TokenPredictionBattle.checkBattleResult(
               battleId
             );
             if (result) {
+              console.log("Battle result:", result);
               const battleJob = await TokenPredictionBattle.getJob(battleId);
               if (battleJob) {
                 const battle = battleJob.data.battle;
