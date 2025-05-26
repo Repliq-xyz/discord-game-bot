@@ -103,39 +103,46 @@ export async function handleTokenSelect(
   interaction: StringSelectMenuInteraction
 ) {
   try {
-    console.log("Starting handleTokenSelect...");
-    const battleId = interaction.message.reference?.messageId;
-    console.log("Battle ID from reference:", battleId);
+    console.log("Starting handleTokenSelect function");
+    const battleId = interaction.message.id;
+    console.log("Retrieved battle ID:", battleId);
 
-    if (!battleId) {
-      console.log("No battle ID found in message reference");
+    // Get user points first
+    const userPoints = await UserService.getUserPoints(interaction.user.id);
+    console.log("User points:", userPoints);
+
+    // Get battle
+    const battle = await TokenPredictionBattle.getBattle(battleId);
+    console.log("Retrieved battle:", battle);
+
+    if (!battle) {
       await interaction.reply({
-        content: "Could not find the battle message!",
+        content: "Battle not found.",
         ephemeral: true,
       });
       return;
     }
 
-    const battle = await TokenPredictionBattle.getBattle(battleId);
-    console.log("Retrieved battle:", battle);
-
-    if (!battle) {
-      console.log("Battle not found in database");
+    if (battle.joined) {
       await interaction.reply({
-        content: "Battle not found!",
+        content: "This battle already has a participant.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    if (battle.creatorId === interaction.user.id) {
+      await interaction.reply({
+        content: "You cannot join your own battle.",
         ephemeral: true,
       });
       return;
     }
 
     // Check if user has enough points
-    const userPoints = await UserService.getUserPoints(interaction.user.id);
-    console.log("User points:", userPoints, "Required points:", battle.points);
-
     if (userPoints < battle.points) {
-      console.log("User doesn't have enough points");
       await interaction.reply({
-        content: `You don't have enough points! You need ${battle.points} points to join this battle.`,
+        content: `You don't have enough points to join this battle. Required: ${battle.points}, You have: ${userPoints}`,
         ephemeral: true,
       });
       return;
@@ -144,154 +151,141 @@ export async function handleTokenSelect(
     const selectedToken = interaction.values[0];
     console.log("Selected token:", selectedToken);
 
-    console.log("Attempting to join battle...");
-    await TokenPredictionBattle.joinBattle(
-      battleId,
-      interaction.user.id,
-      selectedToken
-    );
-    console.log("Successfully called joinBattle");
-
-    // Remove points from joiner
-    console.log("Removing points from joiner...");
+    // Remove points from user first
     await UserService.updatePoints(interaction.user.id, -battle.points);
-    console.log("Points removed successfully");
+    console.log("Removed points from user");
 
-    // Wait for battle update
-    console.log("Waiting for battle update...");
-    const updatedBattle = await waitForBattleUpdate(battleId);
-    console.log("Updated battle:", updatedBattle);
+    try {
+      // Join battle
+      await TokenPredictionBattle.joinBattle(
+        battleId,
+        interaction.user.id,
+        selectedToken
+      );
+      console.log("Successfully joined battle");
 
-    if (!updatedBattle) {
-      console.log("Battle update failed, returning points");
-      // Return points if battle update failed
+      // Get updated battle
+      const updatedBattle = await TokenPredictionBattle.getBattle(battleId);
+      console.log("Updated battle:", updatedBattle);
+
+      if (!updatedBattle) {
+        throw new Error("Failed to get updated battle");
+      }
+
+      // Get channel and message
+      const channel = await client.channels.fetch(battle.channelId);
+      if (!channel?.isTextBased()) {
+        throw new Error("Channel not found or not text-based");
+      }
+      const textChannel = channel as TextChannel;
+      const message = await textChannel.messages.fetch(battleId);
+      if (!message) {
+        throw new Error("Message not found");
+      }
+
+      // Create updated embed
+      const updatedEmbed = {
+        color: 0x0099ff,
+        title: "Token Prediction Battle",
+        description: `Battle between <@${updatedBattle.creatorId}> and <@${updatedBattle.joinerId}>`,
+        fields: [
+          {
+            name: "Creator's Token",
+            value:
+              tokens.find((t) => t.tokenAddress === updatedBattle.creatorToken)
+                ?.name || "Unknown",
+            inline: true,
+          },
+          {
+            name: "Joiner's Token",
+            value:
+              tokens.find((t) => t.tokenAddress === updatedBattle.joinerToken)
+                ?.name || "Unknown",
+            inline: true,
+          },
+          {
+            name: "Timeframe",
+            value: `${updatedBattle.timeframe} hours`,
+            inline: true,
+          },
+          {
+            name: "Points",
+            value: updatedBattle.points.toString(),
+            inline: true,
+          },
+        ],
+        timestamp: new Date().toISOString(),
+      };
+
+      // Update message
+      await message.edit({
+        embeds: [updatedEmbed],
+        components: [],
+      });
+      console.log("Updated battle message");
+
+      // Send feed message
+      const feedChannel = await client.channels.fetch(
+        process.env.FEED_CHANNEL_ID || ""
+      );
+      if (feedChannel?.isTextBased()) {
+        const textChannel = feedChannel as TextChannel;
+        const feedEmbed = {
+          color: 0x00ff00,
+          title: "Battle Joined",
+          description: `<@${interaction.user.id}> has joined the battle against <@${updatedBattle.creatorId}>`,
+          fields: [
+            {
+              name: "Creator's Token",
+              value:
+                tokens.find(
+                  (t) => t.tokenAddress === updatedBattle.creatorToken
+                )?.name || "Unknown",
+              inline: true,
+            },
+            {
+              name: "Joiner's Token",
+              value:
+                tokens.find((t) => t.tokenAddress === updatedBattle.joinerToken)
+                  ?.name || "Unknown",
+              inline: true,
+            },
+            {
+              name: "Points",
+              value: updatedBattle.points.toString(),
+              inline: true,
+            },
+          ],
+          timestamp: new Date().toISOString(),
+        };
+
+        await textChannel.send({ embeds: [feedEmbed] });
+        console.log("Sent feed message");
+      }
+
+      // Add battle check to queue
+      const delay = updatedBattle.endTime - Date.now();
+      await BattleQueue.addBattleCheck(battleId, delay);
+      console.log("Added battle check to queue");
+
+      await interaction.reply({
+        content: "You have successfully joined the battle!",
+        ephemeral: true,
+      });
+      console.log("Successfully replied to user");
+    } catch (error) {
+      console.error("Error in battle join process:", error);
+      // Return points to user if battle join fails
       await UserService.updatePoints(interaction.user.id, battle.points);
       await interaction.reply({
         content: "Failed to join battle. Your points have been returned.",
         ephemeral: true,
       });
-      return;
     }
-
-    // Get the original message to edit
-    console.log("Fetching battle channel:", battle.channelId);
-    const channel = await client.channels.fetch(battle.channelId);
-    console.log("Channel fetched:", channel?.id);
-
-    if (!channel?.isTextBased()) {
-      console.log("Channel is not text based");
-      await interaction.reply({
-        content: "Could not find the battle channel!",
-        ephemeral: true,
-      });
-      return;
-    }
-
-    const textChannel = channel as TextChannel;
-    console.log("Fetching original message:", battleId);
-    const originalMessage = await textChannel.messages.fetch(battleId);
-    console.log("Original message fetched:", originalMessage?.id);
-
-    if (!originalMessage) {
-      console.log("Could not find original message");
-      await interaction.reply({
-        content: "Could not find the original message!",
-        ephemeral: true,
-      });
-      return;
-    }
-
-    // Update battle message
-    console.log("Creating updated embed...");
-    const updatedEmbed = new EmbedBuilder()
-      .setColor("#0099ff")
-      .setTitle("Token Prediction Battle")
-      .setDescription("Battle is in progress!")
-      .addFields(
-        { name: "Creator", value: `<@${battle.creatorId}>`, inline: true },
-        {
-          name: "Creator's Token",
-          value:
-            tokens.find((t) => t.tokenAddress === battle.creatorToken)?.name ||
-            battle.creatorToken,
-          inline: true,
-        },
-        { name: "Joiner", value: `<@${interaction.user.id}>`, inline: true },
-        {
-          name: "Joiner's Token",
-          value:
-            tokens.find((t) => t.tokenAddress === selectedToken)?.name ||
-            selectedToken,
-          inline: true,
-        },
-        { name: "Timeframe", value: battle.timeframe, inline: true },
-        { name: "Points", value: battle.points.toString(), inline: true }
-      )
-      .setTimestamp();
-
-    console.log("Editing original message...");
-    await originalMessage.edit({
-      embeds: [updatedEmbed],
-      components: [],
-    });
-    console.log("Message edited successfully");
-
-    // Send feed message
-    console.log("Fetching feed channel...");
-    const feedChannel = await client.channels.fetch(
-      process.env.FEED_CHANNEL_ID || ""
-    );
-    console.log("Feed channel fetched:", feedChannel?.id);
-
-    if (feedChannel?.isTextBased()) {
-      const textChannel = feedChannel as TextChannel;
-      console.log("Creating feed embed...");
-      const feedEmbed = new EmbedBuilder()
-        .setColor("#00ff00")
-        .setTitle("Battle Joined!")
-        .setDescription("A new battle has been joined!")
-        .addFields(
-          { name: "Creator", value: `<@${battle.creatorId}>`, inline: true },
-          {
-            name: "Creator's Token",
-            value:
-              tokens.find((t) => t.tokenAddress === battle.creatorToken)
-                ?.name || battle.creatorToken,
-            inline: true,
-          },
-          { name: "Joiner", value: `<@${interaction.user.id}>`, inline: true },
-          {
-            name: "Joiner's Token",
-            value:
-              tokens.find((t) => t.tokenAddress === selectedToken)?.name ||
-              selectedToken,
-            inline: true,
-          },
-          { name: "Timeframe", value: battle.timeframe, inline: true },
-          { name: "Points", value: battle.points.toString(), inline: true }
-        )
-        .setTimestamp();
-
-      console.log("Sending feed message...");
-      await textChannel.send({ embeds: [feedEmbed] });
-      console.log("Feed message sent successfully");
-    }
-
-    console.log("Sending success reply to user...");
-    await interaction.reply({
-      content: `You have joined the battle! ${battle.points} points have been deducted from your balance.`,
-      ephemeral: true,
-    });
-
-    // Add battle check to queue
-    console.log("Adding battle check to queue...");
-    await BattleQueue.addBattleCheck(battleId, battle.endTime - Date.now());
-    console.log("Battle check added to queue successfully");
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error in handleTokenSelect:", error);
-    console.error("Error stack:", error.stack);
     await interaction.reply({
-      content: `Error joining battle: ${error.message}`,
+      content: "An error occurred while processing your request.",
       ephemeral: true,
     });
   }
