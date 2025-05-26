@@ -1,6 +1,7 @@
 import { Client, GatewayIntentBits, Events } from "discord.js";
 import { CommandHandler } from "./handlers/commandHandler";
 import { PredictionQueue } from "./services/predictionQueue";
+import { BattleQueue } from "./services/battleQueue";
 import { handleJoinBattle, handleTokenSelect } from "./handlers/buttonHandlers";
 import dotenv from "dotenv";
 
@@ -42,10 +43,18 @@ client.once(Events.ClientReady, async (readyClient) => {
     await PredictionQueue.initialize();
     console.log("Prediction queue initialized successfully!");
 
+    // Initialize battle queue
+    await BattleQueue.initialize();
+    console.log("Battle queue initialized successfully!");
+
     // Log queue stats every minute
     setInterval(async () => {
-      const stats = await PredictionQueue.getQueueStats();
-      console.log("Queue stats:", stats);
+      const predictionStats = await PredictionQueue.getQueueStats();
+      const battleStats = await BattleQueue.getQueueStats();
+      console.log("Queue stats:", {
+        prediction: predictionStats,
+        battle: battleStats,
+      });
     }, 60000);
   } catch (error) {
     console.error("Error during initialization:", error);
