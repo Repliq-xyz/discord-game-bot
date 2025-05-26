@@ -24,16 +24,68 @@ interface BattlePrices {
 export class TokenPredictionBattle {
   private static queue: Queue;
   private static readonly BATTLE_PREFIX = "battle:";
+  private static instance: TokenPredictionBattle | null = null;
 
-  static async initialize() {
-    if (!this.queue) {
-      this.queue = new Queue("battle-storage", {
-        connection: {
-          host: process.env.REDIS_HOST,
-          port: parseInt(process.env.REDIS_PORT || "6379"),
+  private constructor() {
+    try {
+      console.log("Creating new battle storage queue instance...");
+
+      // Parse Redis URL
+      const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
+      const url = new URL(redisUrl);
+      console.log(`Parsed Redis URL: ${url.hostname}:${url.port}`);
+
+      const connectionConfig = {
+        family: 0,
+        host: url.hostname,
+        port: Number(url.port),
+        username: url.username || undefined,
+        password: url.password || undefined,
+      };
+
+      console.log("Redis connection config:", {
+        host: connectionConfig.host,
+        port: connectionConfig.port,
+        hasUsername: !!connectionConfig.username,
+        hasPassword: !!connectionConfig.password,
+      });
+
+      // Create a new queue
+      TokenPredictionBattle.queue = new Queue("battle-storage", {
+        connection: connectionConfig,
+        defaultJobOptions: {
+          attempts: 3,
+          backoff: {
+            type: "exponential",
+            delay: 1000,
+          },
+          removeOnComplete: true,
+          removeOnFail: false,
         },
       });
+
+      console.log("Battle storage queue instance created successfully");
+    } catch (error) {
+      console.error("Error creating battle storage queue instance:", error);
+      throw error;
     }
+  }
+
+  static async initialize() {
+    if (this.instance) {
+      return this.instance;
+    }
+
+    console.log("Initializing Redis connection for battle storage...");
+    const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
+    const url = new URL(redisUrl);
+    console.log(`Connecting to Redis at ${url.hostname}:${url.port}`);
+
+    this.instance = new TokenPredictionBattle();
+    await this.queue.waitUntilReady();
+    console.log("Successfully connected to Redis for battle storage!");
+
+    return this.instance;
   }
 
   static async getJob(battleId: string) {
@@ -211,5 +263,11 @@ export class TokenPredictionBattle {
       name: token.name,
       value: token.tokenAddress,
     }));
+  }
+
+  static async close() {
+    if (this.queue) {
+      await this.queue.close();
+    }
   }
 }
