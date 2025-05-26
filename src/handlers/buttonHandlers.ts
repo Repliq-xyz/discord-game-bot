@@ -134,36 +134,8 @@ export async function handleTokenSelect(interaction: any) {
       ephemeral: true,
     });
 
-    // Set up result checking
-    setTimeout(async () => {
-      const result = await TokenPredictionBattle.checkBattleResult(
-        interaction.message.reference?.messageId
-      );
-      if (result) {
-        const resultEmbed = new EmbedBuilder()
-          .setColor("#00ff00")
-          .setTitle("Battle Result")
-          .setDescription(`Winner: <@${result.winner}>`)
-          .addFields(
-            {
-              name: "Points Won",
-              value: result.points.toString(),
-              inline: true,
-            },
-            {
-              name: "Loser",
-              value: `<@${result.loser}>`,
-              inline: true,
-            }
-          )
-          .setTimestamp();
-
-        await interaction.message.edit({
-          embeds: [resultEmbed],
-          components: [],
-        });
-      }
-    }, battle.endTime - Date.now());
+    // Add battle check to queue
+    await BattleQueue.addBattleCheck(battleId, battle.endTime - Date.now());
   } catch (error: any) {
     console.error("Error handling token select:", error);
     await interaction.reply({
