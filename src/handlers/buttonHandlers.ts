@@ -73,6 +73,21 @@ export async function handleJoinBattle(interaction: ButtonInteraction) {
   }
 }
 
+async function waitForBattleUpdate(
+  battleId: string,
+  maxAttempts = 5
+): Promise<any> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const battle = await TokenPredictionBattle.getBattle(battleId);
+    if (battle && battle.joined && battle.joinerId && battle.joinerToken) {
+      return battle;
+    }
+    // Wait for 500ms before next attempt
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  return null;
+}
+
 export async function handleTokenSelect(interaction: any) {
   try {
     const battleId = interaction.message.reference?.messageId;
@@ -91,11 +106,11 @@ export async function handleTokenSelect(interaction: any) {
       selectedToken
     );
 
-    // Update battle message
-    const battle = await TokenPredictionBattle.getBattle(battleId);
+    // Wait for battle to be updated
+    const battle = await waitForBattleUpdate(battleId);
     if (!battle) {
       await interaction.reply({
-        content: "Battle not found!",
+        content: "Error updating battle. Please try again.",
         ephemeral: true,
       });
       return;
@@ -116,12 +131,12 @@ export async function handleTokenSelect(interaction: any) {
             "Unknown",
           inline: true,
         },
-        { name: "Joiner", value: `<@${interaction.user.id}>`, inline: true },
+        { name: "Joiner", value: `<@${battle.joinerId}>`, inline: true },
         {
           name: "Joiner's Token",
           value:
-            tokens.find((t) => t.value === selectedToken)?.name ||
-            selectedToken ||
+            tokens.find((t) => t.value === battle.joinerToken)?.name ||
+            battle.joinerToken ||
             "Unknown",
           inline: true,
         },
@@ -166,12 +181,12 @@ export async function handleTokenSelect(interaction: any) {
               "Unknown",
             inline: true,
           },
-          { name: "Joiner", value: `<@${interaction.user.id}>`, inline: true },
+          { name: "Joiner", value: `<@${battle.joinerId}>`, inline: true },
           {
             name: "Joiner's Token",
             value:
-              tokens.find((t) => t.value === selectedToken)?.name ||
-              selectedToken ||
+              tokens.find((t) => t.value === battle.joinerToken)?.name ||
+              battle.joinerToken ||
               "Unknown",
             inline: true,
           },
