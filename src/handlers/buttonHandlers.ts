@@ -5,9 +5,13 @@ import {
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
   TextChannel,
+  StringSelectMenuInteraction,
 } from "discord.js";
 import { TokenPredictionBattle } from "../services/tokenPredictionBattle";
 import { BattleQueue } from "../services/battleQueue";
+import { UserService } from "../services/userService";
+import { client } from "../index";
+import { tokens } from "../data/tokens";
 
 export async function handleJoinBattle(interaction: ButtonInteraction) {
   try {
@@ -88,12 +92,33 @@ async function waitForBattleUpdate(
   return null;
 }
 
-export async function handleTokenSelect(interaction: any) {
+export async function handleTokenSelect(
+  interaction: StringSelectMenuInteraction
+) {
   try {
     const battleId = interaction.message.reference?.messageId;
     if (!battleId) {
       await interaction.reply({
         content: "Could not find the battle message!",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const battle = await TokenPredictionBattle.getBattle(battleId);
+    if (!battle) {
+      await interaction.reply({
+        content: "Battle not found!",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    // Check if user has enough points
+    const userPoints = await UserService.getUserPoints(interaction.user.id);
+    if (userPoints < battle.points) {
+      await interaction.reply({
+        content: `You don't have enough points! You need ${battle.points} points to join this battle.`,
         ephemeral: true,
       });
       return;
@@ -106,17 +131,32 @@ export async function handleTokenSelect(interaction: any) {
       selectedToken
     );
 
-    // Wait for battle to be updated
-    const battle = await waitForBattleUpdate(battleId);
-    if (!battle) {
+    // Remove points from joiner
+    await UserService.updatePoints(interaction.user.id, -battle.points);
+
+    // Wait for battle update
+    const updatedBattle = await waitForBattleUpdate(battleId);
+    if (!updatedBattle) {
+      // Return points if battle update failed
+      await UserService.updatePoints(interaction.user.id, battle.points);
       await interaction.reply({
-        content: "Error updating battle. Please try again.",
+        content: "Failed to join battle. Your points have been returned.",
         ephemeral: true,
       });
       return;
     }
 
-    const tokens = await TokenPredictionBattle.getAvailableTokens();
+    // Get the original message to edit
+    const originalMessage = await interaction.message.fetch();
+    if (!originalMessage) {
+      await interaction.reply({
+        content: "Could not find the original message!",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    // Update battle message
     const updatedEmbed = new EmbedBuilder()
       .setColor("#0099ff")
       .setTitle("Token Prediction Battle")
@@ -126,85 +166,67 @@ export async function handleTokenSelect(interaction: any) {
         {
           name: "Creator's Token",
           value:
-            tokens.find((t) => t.value === battle.creatorToken)?.name ||
-            battle.creatorToken ||
-            "Unknown",
+            tokens.find((t) => t.tokenAddress === battle.creatorToken)?.name ||
+            battle.creatorToken,
           inline: true,
         },
-        { name: "Joiner", value: `<@${battle.joinerId}>`, inline: true },
+        { name: "Joiner", value: `<@${interaction.user.id}>`, inline: true },
         {
           name: "Joiner's Token",
           value:
-            tokens.find((t) => t.value === battle.joinerToken)?.name ||
-            battle.joinerToken ||
-            "Unknown",
+            tokens.find((t) => t.tokenAddress === selectedToken)?.name ||
+            selectedToken,
           inline: true,
         },
-        {
-          name: "Timeframe",
-          value: battle.timeframe || "Unknown",
-          inline: true,
-        },
-        { name: "Points", value: (battle.points || 0).toString(), inline: true }
+        { name: "Timeframe", value: battle.timeframe, inline: true },
+        { name: "Points", value: battle.points.toString(), inline: true }
       )
       .setTimestamp();
 
-    // Get the original message to edit
-    const originalMessage = await interaction.message.fetchReference();
     await originalMessage.edit({
       embeds: [updatedEmbed],
       components: [],
     });
 
-    await interaction.reply({
-      content: "You have joined the battle!",
-      ephemeral: true,
-    });
-
-    // Send feed message about battle join
-    const feedChannel = interaction.guild?.channels.cache.get(
-      process.env.FEED_CHANNEL_ID as string
-    ) as TextChannel;
-
-    if (feedChannel) {
+    // Send feed message
+    const feedChannel = await client.channels.fetch(
+      process.env.FEED_CHANNEL_ID || ""
+    );
+    if (feedChannel?.isTextBased()) {
+      const textChannel = feedChannel as TextChannel;
       const feedEmbed = new EmbedBuilder()
         .setColor("#00ff00")
-        .setTitle("Battle Joined")
-        .setDescription("A new battle has started!")
+        .setTitle("Battle Joined!")
+        .setDescription("A new battle has been joined!")
         .addFields(
           { name: "Creator", value: `<@${battle.creatorId}>`, inline: true },
           {
             name: "Creator's Token",
             value:
-              tokens.find((t) => t.value === battle.creatorToken)?.name ||
-              battle.creatorToken ||
-              "Unknown",
+              tokens.find((t) => t.tokenAddress === battle.creatorToken)
+                ?.name || battle.creatorToken,
             inline: true,
           },
-          { name: "Joiner", value: `<@${battle.joinerId}>`, inline: true },
+          { name: "Joiner", value: `<@${interaction.user.id}>`, inline: true },
           {
             name: "Joiner's Token",
             value:
-              tokens.find((t) => t.value === battle.joinerToken)?.name ||
-              battle.joinerToken ||
-              "Unknown",
+              tokens.find((t) => t.tokenAddress === selectedToken)?.name ||
+              selectedToken,
             inline: true,
           },
-          {
-            name: "Timeframe",
-            value: battle.timeframe || "Unknown",
-            inline: true,
-          },
-          {
-            name: "Points",
-            value: (battle.points || 0).toString(),
-            inline: true,
-          }
+          { name: "Timeframe", value: battle.timeframe, inline: true },
+          { name: "Points", value: battle.points.toString(), inline: true }
         )
         .setTimestamp();
 
-      await feedChannel.send({ embeds: [feedEmbed] });
+      await textChannel.send({ embeds: [feedEmbed] });
     }
+
+    await interaction.reply({
+      content: `You have joined the battle! ${battle.points} points have been deducted from your balance.`,
+      ephemeral: true,
+    });
 
     // Add battle check to queue
     await BattleQueue.addBattleCheck(battleId, battle.endTime - Date.now());

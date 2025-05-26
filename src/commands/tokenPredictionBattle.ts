@@ -11,6 +11,7 @@ import { Command } from "../types/Command";
 import { TokenPredictionBattle } from "../services/tokenPredictionBattle";
 import { BattleQueue } from "../services/battleQueue";
 import { tokens } from "../data/tokens";
+import { UserService } from "../services/userService";
 
 // Fonction utilitaire pour calculer le temps de fin
 function calculateEndTime(startTime: number, timeframe: string): number {
@@ -119,6 +120,9 @@ export const command: Command = {
         points
       );
 
+      // Remove points from creator
+      await UserService.updatePoints(interaction.user.id, -points);
+
       // Add jobs to queue
       await BattleQueue.addUnjoinedBattleDeletion(battleMessage.id, 60000); // 1 minute timeout
       await BattleQueue.addBattleCheck(
@@ -127,7 +131,7 @@ export const command: Command = {
       );
 
       await interaction.reply({
-        content: "Battle created successfully!",
+        content: `Battle created successfully! ${points} points have been deducted from your balance.`,
         ephemeral: true,
       });
     } catch (error: any) {

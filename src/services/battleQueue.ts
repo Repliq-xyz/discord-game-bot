@@ -2,6 +2,7 @@ import { Queue, Worker } from "bullmq";
 import { TokenPredictionBattle } from "./tokenPredictionBattle";
 import { client } from "../index";
 import { TextChannel } from "discord.js";
+import { UserService } from "./userService";
 
 interface BattleJob {
   battleId: string;
@@ -72,6 +73,12 @@ export class BattleQueue {
                   const textChannel = channel as TextChannel;
                   const message = await textChannel.messages.fetch(battleId);
                   if (message) {
+                    // Give points to winner
+                    await UserService.updatePoints(
+                      result.winner,
+                      battle.points * 2
+                    );
+
                     const resultEmbed = {
                       color: 0x00ff00,
                       title: "Battle Result",
@@ -79,7 +86,7 @@ export class BattleQueue {
                       fields: [
                         {
                           name: "Points Won",
-                          value: result.points.toString(),
+                          value: (battle.points * 2).toString(),
                           inline: true,
                         },
                         {
@@ -100,10 +107,14 @@ export class BattleQueue {
               }
             }
           } else if (type === "delete_unjoined") {
+            console.log("Deleting unjoined battle...");
             const battleJob = await TokenPredictionBattle.getJob(battleId);
             if (battleJob) {
               const battle = battleJob.data.battle;
               if (!battle.joined) {
+                // Return points to creator if no one joined
+                await UserService.updatePoints(battle.creatorId, battle.points);
+
                 const channel = await client.channels.fetch(battle.channelId);
                 if (channel?.isTextBased()) {
                   const textChannel = channel as TextChannel;
