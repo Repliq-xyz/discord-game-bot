@@ -107,11 +107,13 @@ export class BattleQueue {
               }
             }
           } else if (type === "delete_unjoined") {
-            console.log("Deleting unjoined battle...");
+            console.log("Checking if battle should be deleted...");
             const battleJob = await TokenPredictionBattle.getJob(battleId);
             if (battleJob) {
               const battle = battleJob.data.battle;
+              // Only delete if the battle hasn't been joined
               if (!battle.joined) {
+                console.log("Battle not joined, proceeding with deletion...");
                 // Return points to creator if no one joined
                 await UserService.updatePoints(battle.creatorId, battle.points);
 
@@ -124,6 +126,8 @@ export class BattleQueue {
                   }
                 }
                 await TokenPredictionBattle.deleteBattle(battleId);
+              } else {
+                console.log("Battle has been joined, skipping deletion...");
               }
             }
           }
