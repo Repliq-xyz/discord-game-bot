@@ -277,6 +277,14 @@ export async function handleTokenSelect(
       await BattleQueue.addBattleCheck(battleId, delay);
       console.log("Added battle check to queue");
 
+      // Delete the token selection message
+      try {
+        await interaction.message.delete();
+        console.log("Deleted token selection message");
+      } catch (error) {
+        console.error("Error deleting token selection message:", error);
+      }
+
       await interaction.reply({
         content: "You have successfully joined the battle!",
         ephemeral: true,
@@ -299,5 +307,3 @@ export async function handleTokenSelect(
     });
   }
 }
-
-// Job 2 failed for battle 1376558267748192256: TypeError: job.finished is not a function
