@@ -64,7 +64,13 @@ export class PermanentMessageService {
     await channel.permissionOverwrites.set([
       {
         id: channel.guild.roles.everyone,
-        deny: [PermissionFlagsBits.SendMessages],
+        deny: [
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.CreatePublicThreads,
+          PermissionFlagsBits.CreatePrivateThreads,
+          PermissionFlagsBits.SendMessagesInThreads,
+          PermissionFlagsBits.AddReactions,
+        ],
         allow: [
           PermissionFlagsBits.ViewChannel,
           PermissionFlagsBits.ReadMessageHistory,
@@ -77,6 +83,12 @@ export class PermanentMessageService {
           PermissionFlagsBits.SendMessages,
           PermissionFlagsBits.ReadMessageHistory,
           PermissionFlagsBits.ManageMessages,
+          PermissionFlagsBits.ManageThreads,
+        ],
+        deny: [
+          PermissionFlagsBits.CreatePublicThreads,
+          PermissionFlagsBits.CreatePrivateThreads,
+          PermissionFlagsBits.SendMessagesInThreads,
         ],
       },
     ]);
