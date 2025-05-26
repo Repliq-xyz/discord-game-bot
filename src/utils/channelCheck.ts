@@ -5,7 +5,7 @@ export const isPrivateGamesChannel = (
 ): boolean => {
   if (!interaction.guild || !interaction.channel) return false;
 
-  // Vérifie si le canal est un TextChannel et un canal privé de jeux
+  // Check if the channel is a TextChannel and a private games channel
   return (
     interaction.channel instanceof TextChannel &&
     interaction.channel.name === `games-${interaction.user.id}`
@@ -18,7 +18,7 @@ export const checkPrivateGamesChannel = async (
   if (!isPrivateGamesChannel(interaction)) {
     await interaction.reply({
       content:
-        "Cette commande ne peut être utilisée que dans votre canal privé de jeux. Utilisez `/start-games` pour y accéder.",
+        "This command can only be used in your private games channel. Use `/start-games` to access it.",
       ephemeral: true,
     });
     return false;
