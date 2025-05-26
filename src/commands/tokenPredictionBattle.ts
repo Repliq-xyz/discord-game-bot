@@ -85,14 +85,14 @@ export const command: Command = {
       );
 
       // Find battle channel
-      const battleChannel = interaction.guild?.channels.cache.find(
-        (channel) => channel.name === "battle"
+      const battleChannel = interaction.guild?.channels.cache.get(
+        process.env.BATTLE_CHANNEL_ID as string
       ) as TextChannel;
 
       if (!battleChannel) {
         await interaction.reply({
           content:
-            "Battle channel not found! Please create a channel named 'battle'",
+            "Battle channel not found! Please check the BATTLE_CHANNEL_ID in your environment variables",
           ephemeral: true,
         });
         return;
