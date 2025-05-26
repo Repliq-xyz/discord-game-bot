@@ -262,6 +262,7 @@ export class TokenPredictionBattle {
     return tokens.map((token) => ({
       name: token.name,
       value: token.tokenAddress,
+      inline: true,
     }));
   }
 
