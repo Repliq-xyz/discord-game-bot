@@ -153,16 +153,28 @@ export class TokenPredictionBattle {
     console.log("Token prices:", prices);
 
     // Update battle state
-    battle.joined = true;
-    battle.joinerId = joinerId;
-    battle.joinerToken = token;
+    const updatedBattle = {
+      ...battle,
+      joined: true,
+      joinerId: joinerId,
+      joinerToken: token,
+    };
 
-    console.log("Updating battle state with:", battle);
+    console.log("Updating battle state with:", updatedBattle);
+
+    // Remove existing job first
+    const existingJob = await this.queue.getJob(
+      `${this.BATTLE_PREFIX}${battleId}`
+    );
+    if (existingJob) {
+      await existingJob.remove();
+    }
+
     // Store updated battle with prices
     await this.queue.add(
       "update_battle",
       {
-        battle,
+        battle: updatedBattle,
         prices,
         startTime: Date.now(),
       },
@@ -174,13 +186,13 @@ export class TokenPredictionBattle {
 
     console.log("Verifying battle update...");
     // Verify the update was successful
-    const updatedBattle = await this.getBattle(battleId);
-    console.log("Updated battle state:", updatedBattle);
-    if (!updatedBattle || !updatedBattle.joined) {
+    const finalBattle = await this.getBattle(battleId);
+    console.log("Updated battle state:", finalBattle);
+    if (!finalBattle || !finalBattle.joined) {
       console.error("Battle update verification failed:", {
-        updatedBattle,
+        finalBattle,
         expectedJoined: true,
-        actualJoined: updatedBattle?.joined,
+        actualJoined: finalBattle?.joined,
       });
       throw new Error("Failed to update battle state");
     }
