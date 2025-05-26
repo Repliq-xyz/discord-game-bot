@@ -7,6 +7,7 @@ import {
   EmbedBuilder,
   PermissionFlagsBits,
 } from "discord.js";
+import { redisClient } from "./redis";
 
 const GAMES_INFO = {
   "token-prediction": {
@@ -31,9 +32,10 @@ const GAMES_INFO = {
   },
 };
 
+const PERMANENT_MESSAGE_KEY = "game-rules-message-id";
+
 export class PermanentMessageService {
   private static instance: PermanentMessageService;
-  private messageId: string | null = null;
 
   private constructor() {}
 
@@ -42,6 +44,14 @@ export class PermanentMessageService {
       PermanentMessageService.instance = new PermanentMessageService();
     }
     return PermanentMessageService.instance;
+  }
+
+  private async getMessageId(): Promise<string | null> {
+    return await redisClient.get(PERMANENT_MESSAGE_KEY);
+  }
+
+  private async setMessageId(id: string): Promise<void> {
+    await redisClient.set(PERMANENT_MESSAGE_KEY, id);
   }
 
   public async createOrUpdateMessage(client: Client) {
@@ -86,31 +96,31 @@ export class PermanentMessageService {
         {
           name: "🚀 Getting Started",
           value:
-            "1. Click the 'Start Game' button below\n2. You'll get access to your private channel\n3. All game commands can only be used in your private channel",
+            "1. Click the 'Start Game' button below\n2. You'll get access to your private channel\n3. All game commands can only be used in your private channel\n\n",
           inline: false,
         },
         {
           name: "🎯 Daily Points",
           value:
-            "Use `/claim` to get your daily 20 points! This is your starting point for playing games.",
+            "Use `/claim` to get your daily 20 points! This is your starting point for playing games.\n\n",
           inline: false,
         },
         {
           name: "📊 Token Prediction",
           value:
-            "Use `/token-prediction [token]` to predict if a token's price will go up or down. Earn points based on your prediction accuracy!",
+            "Use `/token-prediction [token]` to predict if a token's price will go up or down. Earn points based on your prediction accuracy!\n\n",
           inline: false,
         },
         {
           name: "⚔️ Token Prediction Battle",
           value:
-            "Use `/token-prediction-battle` to challenge other players! Win battles to earn more points and climb the leaderboard.",
+            "Use `/token-prediction-battle` to challenge other players! Win battles to earn more points and climb the leaderboard.\n\n",
           inline: false,
         },
         {
           name: "🏆 Leaderboard",
           value:
-            "Use `/points leaderboard` to see who's leading the game. Compete with other players to reach the top!",
+            "Use `/points leaderboard` to see who's leading the game. Compete with other players to reach the top!\n\n",
           inline: false,
         },
         {
@@ -128,9 +138,10 @@ export class PermanentMessageService {
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(button);
 
-    if (this.messageId) {
+    const messageId = await this.getMessageId();
+    if (messageId) {
       try {
-        const message = await channel.messages.fetch(this.messageId);
+        const message = await channel.messages.fetch(messageId);
         await message.edit({
           embeds: [welcomeEmbed, rulesEmbed],
           components: [row],
@@ -141,22 +152,14 @@ export class PermanentMessageService {
           embeds: [welcomeEmbed, rulesEmbed],
           components: [row],
         });
-        this.messageId = newMessage.id;
+        await this.setMessageId(newMessage.id);
       }
     } else {
       const message = await channel.send({
         embeds: [welcomeEmbed, rulesEmbed],
         components: [row],
       });
-      this.messageId = message.id;
+      await this.setMessageId(message.id);
     }
-  }
-
-  public setMessageId(id: string) {
-    this.messageId = id;
-  }
-
-  public getMessageId(): string | null {
-    return this.messageId;
   }
 }

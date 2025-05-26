@@ -5,6 +5,7 @@ import { BattleQueue } from "./services/battleQueue";
 import { handleJoinBattle, handleTokenSelect } from "./handlers/buttonHandlers";
 import { handleButtonInteraction } from "./handlers/buttonHandler";
 import { PermanentMessageService } from "./services/permanentMessage";
+import { initializeRedis } from "./services/redis";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -34,6 +35,10 @@ client.once(Events.ClientReady, async (readyClient) => {
   const guildId = process.env.GUILD_ID!;
 
   try {
+    // Initialize Redis
+    await initializeRedis();
+    console.log("Redis initialized successfully!");
+
     await commandHandler.registerCommands(clientId, guildId);
     console.log("Slash commands registered successfully!");
 
