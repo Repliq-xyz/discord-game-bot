@@ -81,14 +81,21 @@ async function waitForBattleUpdate(
   battleId: string,
   maxAttempts = 5
 ): Promise<any> {
+  console.log("Starting waitForBattleUpdate with battleId:", battleId);
   for (let i = 0; i < maxAttempts; i++) {
+    console.log(`Attempt ${i + 1} of ${maxAttempts}`);
     const battle = await TokenPredictionBattle.getBattle(battleId);
+    console.log("Retrieved battle in waitForBattleUpdate:", battle);
+
     if (battle && battle.joined && battle.joinerId && battle.joinerToken) {
+      console.log("Battle update successful!");
       return battle;
     }
+    console.log("Battle not yet updated, waiting 500ms...");
     // Wait for 500ms before next attempt
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
+  console.log("Max attempts reached, battle update failed");
   return null;
 }
 
@@ -289,3 +296,5 @@ export async function handleTokenSelect(
     });
   }
 }
+
+// Job 2 failed for battle 1376558267748192256: TypeError: job.finished is not a function
