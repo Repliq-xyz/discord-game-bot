@@ -3,6 +3,8 @@ import { CommandHandler } from "./handlers/commandHandler";
 import { PredictionQueue } from "./services/predictionQueue";
 import { BattleQueue } from "./services/battleQueue";
 import { handleJoinBattle, handleTokenSelect } from "./handlers/buttonHandlers";
+import { handleButtonInteraction } from "./handlers/buttonHandler";
+import { PermanentMessageService } from "./services/permanentMessage";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -46,6 +48,11 @@ client.once(Events.ClientReady, async (readyClient) => {
     // Initialize battle queue
     await BattleQueue.initialize();
     console.log("Battle queue initialized successfully!");
+
+    // Create or update permanent message
+    const permanentMessageService = PermanentMessageService.getInstance();
+    await permanentMessageService.createOrUpdateMessage(client);
+    console.log("Permanent message created/updated successfully!");
 
     // Log queue stats every minute
     setInterval(async () => {
@@ -93,6 +100,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
   } else if (interaction.isButton()) {
     if (interaction.customId === "join_battle") {
       await handleJoinBattle(interaction);
+    } else {
+      await handleButtonInteraction(interaction);
     }
   } else if (interaction.isStringSelectMenu()) {
     if (interaction.customId === "select_token") {
