@@ -5,6 +5,7 @@ import {
   PermissionFlagsBits,
   TextChannel,
   EmbedBuilder,
+  CategoryChannel,
 } from "discord.js";
 import { Command } from "../types/Command";
 
@@ -41,6 +42,26 @@ export const command: Command = {
     }
 
     try {
+      // Find or create PRIVATE category
+      let privateCategory = interaction.guild.channels.cache.find(
+        (channel) =>
+          channel.type === ChannelType.GuildCategory &&
+          channel.name === "PRIVATE"
+      ) as CategoryChannel | undefined;
+
+      if (!privateCategory) {
+        privateCategory = await interaction.guild.channels.create({
+          name: "PRIVATE",
+          type: ChannelType.GuildCategory,
+          permissionOverwrites: [
+            {
+              id: interaction.guild.id, // @everyone role
+              deny: [PermissionFlagsBits.ViewChannel],
+            },
+          ],
+        });
+      }
+
       // Check if user already has a private games channel
       const existingChannel = interaction.guild.channels.cache.find(
         (channel) =>
@@ -74,6 +95,11 @@ export const command: Command = {
           });
         }
 
+        // Move channel to PRIVATE category if it's not already there
+        if (existingChannel.parentId !== privateCategory.id) {
+          await existingChannel.setParent(privateCategory.id);
+        }
+
         // Send games info in the existing channel
         await existingChannel.send({ embeds: [gamesEmbed] });
 
@@ -84,10 +110,11 @@ export const command: Command = {
         return;
       }
 
-      // Create new private games channel
+      // Create new private games channel in PRIVATE category
       const channel = await interaction.guild.channels.create({
         name: `games-${interaction.user.id}`,
         type: ChannelType.GuildText,
+        parent: privateCategory.id,
         permissionOverwrites: [
           {
             id: interaction.guild.id, // @everyone role
