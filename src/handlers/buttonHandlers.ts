@@ -104,8 +104,17 @@ export async function handleTokenSelect(
 ) {
   try {
     console.log("Starting handleTokenSelect function");
-    const battleId = interaction.message.id;
-    console.log("Retrieved battle ID:", battleId);
+    // Get the original message ID from the interaction
+    const battleId = interaction.message.reference?.messageId;
+    console.log("Retrieved battle ID from reference:", battleId);
+
+    if (!battleId) {
+      await interaction.reply({
+        content: "Could not find the battle message!",
+        ephemeral: true,
+      });
+      return;
+    }
 
     // Get user points first
     const userPoints = await UserService.getUserPoints(interaction.user.id);
