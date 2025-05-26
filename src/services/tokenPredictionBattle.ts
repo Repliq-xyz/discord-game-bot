@@ -1,6 +1,8 @@
 import { Queue } from "bullmq";
 import { TokenService } from "./tokenService";
 import { tokens } from "../data/tokens";
+import { client } from "../index";
+import { TextChannel } from "discord.js";
 
 interface Battle {
   id: string;
@@ -230,21 +232,67 @@ export class TokenPredictionBattle {
         prices.joinerTokenPrice) *
       100;
 
+    let result = null;
     if (creatorPerformance > joinerPerformance) {
-      return {
+      result = {
         winner: battle.creatorId,
         loser: battle.joinerId!,
         points: battle.points,
       };
     } else if (joinerPerformance > creatorPerformance) {
-      return {
+      result = {
         winner: battle.joinerId!,
         loser: battle.creatorId,
         points: battle.points,
       };
     }
 
-    return null; // Draw
+    if (result) {
+      // Send result to feed
+      const feedChannel = await client.channels.fetch(
+        process.env.FEED_CHANNEL_ID || ""
+      );
+      if (feedChannel?.isTextBased()) {
+        const textChannel = feedChannel as TextChannel;
+        const feedEmbed = {
+          color: 0x00ff00,
+          title: "Battle Result",
+          description: `Battle between <@${battle.creatorId}> and <@${battle.joinerId}> has ended!`,
+          fields: [
+            {
+              name: "Winner",
+              value: `<@${result.winner}>`,
+              inline: true,
+            },
+            {
+              name: "Points Won",
+              value: (result.points * 2).toString(),
+              inline: true,
+            },
+            {
+              name: "Loser",
+              value: `<@${result.loser}>`,
+              inline: true,
+            },
+            {
+              name: "Creator's Token Performance",
+              value: `${creatorPerformance.toFixed(2)}%`,
+              inline: true,
+            },
+            {
+              name: "Joiner's Token Performance",
+              value: `${joinerPerformance.toFixed(2)}%`,
+              inline: true,
+            },
+          ],
+          timestamp: new Date().toISOString(),
+        };
+
+        await textChannel.send({ embeds: [feedEmbed] });
+      }
+    }
+
+    return result;
   }
 
   private static calculateEndTime(
