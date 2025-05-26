@@ -147,7 +147,17 @@ export async function handleTokenSelect(
     }
 
     // Get the original message to edit
-    const originalMessage = await interaction.message.fetch();
+    const channel = await client.channels.fetch(battle.channelId);
+    if (!channel?.isTextBased()) {
+      await interaction.reply({
+        content: "Could not find the battle channel!",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const textChannel = channel as TextChannel;
+    const originalMessage = await textChannel.messages.fetch(battleId);
     if (!originalMessage) {
       await interaction.reply({
         content: "Could not find the original message!",
