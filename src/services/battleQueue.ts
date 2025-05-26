@@ -278,4 +278,34 @@ export class BattleQueue {
       await this.queue.close();
     }
   }
+
+  static async cleanAllJobs() {
+    try {
+      if (!this.queue) {
+        await this.initialize();
+      }
+
+      console.log("Cleaning all jobs from battle queue...");
+
+      // Get all jobs
+      const jobs = await this.queue.getJobs([
+        "active",
+        "waiting",
+        "delayed",
+        "failed",
+        "completed",
+      ]);
+      console.log(`Found ${jobs.length} jobs to clean`);
+
+      // Remove all jobs
+      for (const job of jobs) {
+        await job.remove();
+      }
+
+      console.log("Successfully cleaned all jobs from battle queue");
+    } catch (error) {
+      console.error("Error cleaning jobs:", error);
+      throw error;
+    }
+  }
 }
