@@ -61,7 +61,8 @@ export async function handleJoinBattle(interaction: ButtonInteraction) {
 
 export async function handleTokenSelect(interaction: any) {
   try {
-    const battleId = interaction.message.id;
+    // Get the original battle message ID from the reference
+    const battleId = interaction.message.reference?.messageId;
     if (!battleId) {
       await interaction.reply({
         content: "Could not find the battle message!",
@@ -124,7 +125,9 @@ export async function handleTokenSelect(interaction: any) {
       )
       .setTimestamp();
 
-    await interaction.message.edit({
+    // Get the original message to edit
+    const originalMessage = await interaction.message.fetchReference();
+    await originalMessage.edit({
       embeds: [updatedEmbed],
       components: [],
     });
