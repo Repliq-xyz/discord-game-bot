@@ -60,7 +60,20 @@ export const command: Command = {
           permissionOverwrites: [
             {
               id: interaction.guild.id, // @everyone role
-              deny: [PermissionFlagsBits.ViewChannel],
+              deny: [
+                PermissionFlagsBits.ViewChannel,
+                PermissionFlagsBits.SendMessages,
+                PermissionFlagsBits.ReadMessageHistory,
+              ],
+            },
+            {
+              id: interaction.guild.members.me!.id, // Bot role
+              allow: [
+                PermissionFlagsBits.ViewChannel,
+                PermissionFlagsBits.SendMessages,
+                PermissionFlagsBits.ReadMessageHistory,
+                PermissionFlagsBits.ManageChannels,
+              ],
             },
           ],
         });
@@ -134,7 +147,11 @@ export const command: Command = {
         permissionOverwrites: [
           {
             id: interaction.guild.id, // @everyone role
-            deny: [PermissionFlagsBits.ViewChannel],
+            deny: [
+              PermissionFlagsBits.ViewChannel,
+              PermissionFlagsBits.SendMessages,
+              PermissionFlagsBits.ReadMessageHistory,
+            ],
           },
           {
             id: interaction.user.id,
@@ -150,6 +167,7 @@ export const command: Command = {
               PermissionFlagsBits.ViewChannel,
               PermissionFlagsBits.SendMessages,
               PermissionFlagsBits.ReadMessageHistory,
+              PermissionFlagsBits.ManageChannels,
             ],
           },
         ],
