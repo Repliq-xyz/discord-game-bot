@@ -204,8 +204,7 @@ export class TokenPredictionBattle {
     const job = await this.queue.getJob(`${this.BATTLE_PREFIX}${battleId}`);
     if (!job) return null;
 
-    const result = await job.finished();
-    const { battle, prices, startTime } = result;
+    const { battle, prices, startTime } = job.data;
 
     if (!battle.joined || !battle.joinerToken) {
       return null;
