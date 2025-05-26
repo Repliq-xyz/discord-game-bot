@@ -75,7 +75,6 @@ export async function handleJoinBattle(interaction: ButtonInteraction) {
 
 export async function handleTokenSelect(interaction: any) {
   try {
-    // Get the original battle message ID from the reference
     const battleId = interaction.message.reference?.messageId;
     if (!battleId) {
       await interaction.reply({
@@ -117,16 +116,12 @@ export async function handleTokenSelect(interaction: any) {
             "Unknown",
           inline: true,
         },
-        {
-          name: "Joiner",
-          value: `<@${battle.joinerId || "Unknown"}>`,
-          inline: true,
-        },
+        { name: "Joiner", value: `<@${interaction.user.id}>`, inline: true },
         {
           name: "Joiner's Token",
           value:
-            tokens.find((t) => t.value === battle.joinerToken)?.name ||
-            battle.joinerToken ||
+            tokens.find((t) => t.value === selectedToken)?.name ||
+            selectedToken ||
             "Unknown",
           inline: true,
         },
@@ -171,12 +166,12 @@ export async function handleTokenSelect(interaction: any) {
               "Unknown",
             inline: true,
           },
-          { name: "Joiner", value: `<@${battle.joinerId}>`, inline: true },
+          { name: "Joiner", value: `<@${interaction.user.id}>`, inline: true },
           {
             name: "Joiner's Token",
             value:
-              tokens.find((t) => t.value === battle.joinerToken)?.name ||
-              battle.joinerToken ||
+              tokens.find((t) => t.value === selectedToken)?.name ||
+              selectedToken ||
               "Unknown",
             inline: true,
           },
