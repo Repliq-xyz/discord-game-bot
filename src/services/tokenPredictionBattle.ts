@@ -181,13 +181,14 @@ export class TokenPredictionBattle {
     const job = await this.queue.getJob(`${this.BATTLE_PREFIX}${battleId}`);
     if (!job) return null;
 
-    const data = await job.getState();
-    if (data === "completed") {
+    const jobData = await job.getState();
+    if (jobData === "completed") {
       const result = await job.finished();
       return result.battle;
+    } else {
+      const data = await job.getData();
+      return data.battle;
     }
-
-    return null;
   }
 
   static async deleteBattle(battleId: string): Promise<void> {
