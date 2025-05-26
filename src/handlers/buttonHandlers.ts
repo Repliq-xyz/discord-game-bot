@@ -4,6 +4,7 @@ import {
   ActionRowBuilder,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
+  TextChannel,
 } from "discord.js";
 import { TokenPredictionBattle } from "../services/tokenPredictionBattle";
 import { BattleQueue } from "../services/battleQueue";
@@ -136,6 +137,51 @@ export async function handleTokenSelect(interaction: any) {
       content: "You have joined the battle!",
       ephemeral: true,
     });
+
+    // Send feed message about battle join
+    const feedChannel = interaction.guild?.channels.cache.get(
+      process.env.FEED_CHANNEL_ID as string
+    ) as TextChannel;
+
+    if (feedChannel) {
+      const feedEmbed = new EmbedBuilder()
+        .setColor("#00ff00")
+        .setTitle("Battle Joined")
+        .setDescription("A new battle has started!")
+        .addFields(
+          { name: "Creator", value: `<@${battle.creatorId}>`, inline: true },
+          {
+            name: "Creator's Token",
+            value:
+              tokens.find((t) => t.value === battle.creatorToken)?.name ||
+              battle.creatorToken ||
+              "Unknown",
+            inline: true,
+          },
+          { name: "Joiner", value: `<@${battle.joinerId}>`, inline: true },
+          {
+            name: "Joiner's Token",
+            value:
+              tokens.find((t) => t.value === battle.joinerToken)?.name ||
+              battle.joinerToken ||
+              "Unknown",
+            inline: true,
+          },
+          {
+            name: "Timeframe",
+            value: battle.timeframe || "Unknown",
+            inline: true,
+          },
+          {
+            name: "Points",
+            value: (battle.points || 0).toString(),
+            inline: true,
+          }
+        )
+        .setTimestamp();
+
+      await feedChannel.send({ embeds: [feedEmbed] });
+    }
 
     // Add battle check to queue
     await BattleQueue.addBattleCheck(battleId, battle.endTime - Date.now());
