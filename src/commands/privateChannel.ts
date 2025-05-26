@@ -8,6 +8,7 @@ import {
   CategoryChannel,
 } from "discord.js";
 import { Command } from "../types/Command";
+import { UserService } from "../services/userService";
 
 const GAMES_INFO = {
   "token-prediction": {
@@ -42,6 +43,9 @@ export const command: Command = {
     }
 
     try {
+      // Get user points
+      const userPoints = await UserService.getUserPoints(interaction.user.id);
+
       // Find or create PRIVATE category
       let privateCategory = interaction.guild.channels.cache.find(
         (channel) =>
@@ -69,19 +73,30 @@ export const command: Command = {
           channel.name === `games-${interaction.user.id}`
       ) as TextChannel | undefined;
 
+      // Create welcome embed
+      const welcomeEmbed = new EmbedBuilder()
+        .setColor("#0099ff")
+        .setTitle(`Welcome ${interaction.user.username}!`)
+        .setDescription(`You currently have **${userPoints} points**`)
+        .addFields({
+          name: "💎 Daily Points",
+          value: "Use `/claim` to get your daily 20 points!",
+          inline: false,
+        })
+        .setFooter({ text: "Use slash commands to play games!" });
+
       // Create games info embed
       const gamesEmbed = new EmbedBuilder()
         .setColor("#0099ff")
-        .setTitle("🎮 Welcome to your private games space!")
-        .setDescription("Here are the available games in this channel:")
+        .setTitle("🎮 Available Games")
+        .setDescription("Here are the games you can play:")
         .addFields(
           Object.entries(GAMES_INFO).map(([game, info]) => ({
             name: `/${game}`,
             value: `${info.description}\n**Usage:** ${info.usage}\n**Rewards:** ${info.rewards}`,
             inline: false,
           }))
-        )
-        .setFooter({ text: "Use slash commands to play!" });
+        );
 
       if (existingChannel) {
         // Check if user has access to the channel
@@ -100,7 +115,8 @@ export const command: Command = {
           await existingChannel.setParent(privateCategory.id);
         }
 
-        // Send games info in the existing channel
+        // Send welcome and games info in the existing channel
+        await existingChannel.send({ embeds: [welcomeEmbed] });
         await existingChannel.send({ embeds: [gamesEmbed] });
 
         await interaction.reply({
@@ -140,9 +156,7 @@ export const command: Command = {
       });
 
       // Send welcome message and games info
-      await channel.send({
-        content: `Welcome to your private games channel, ${interaction.user}!`,
-      });
+      await channel.send({ embeds: [welcomeEmbed] });
       await channel.send({ embeds: [gamesEmbed] });
 
       await interaction.reply({
