@@ -146,11 +146,12 @@ export class TokenPredictionBattle {
     // Get prices when someone joins
     const prices = await this.getTokenPrices(battle.creatorToken, token);
 
+    // Update battle state
     battle.joined = true;
     battle.joinerId = joinerId;
     battle.joinerToken = token;
 
-    // Store battle with prices
+    // Store updated battle with prices
     await this.queue.add(
       "update_battle",
       {
@@ -158,8 +159,17 @@ export class TokenPredictionBattle {
         prices,
         startTime: Date.now(),
       },
-      { jobId: `${this.BATTLE_PREFIX}${battleId}` }
+      {
+        jobId: `${this.BATTLE_PREFIX}${battleId}`,
+        removeOnComplete: false, // Keep the job in Redis
+      }
     );
+
+    // Verify the update was successful
+    const updatedBattle = await this.getBattle(battleId);
+    if (!updatedBattle || !updatedBattle.joined) {
+      throw new Error("Failed to update battle state");
+    }
   }
 
   private static async getTokenPrices(
