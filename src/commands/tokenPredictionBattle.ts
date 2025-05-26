@@ -137,10 +137,6 @@ export const command: Command = {
 
       // Add jobs to queue
       await BattleQueue.addUnjoinedBattleDeletion(battleMessage.id, 60000); // 1 minute timeout
-      await BattleQueue.addBattleCheck(
-        battleMessage.id,
-        calculateEndTime(Date.now(), timeframe) - Date.now()
-      );
 
       await interaction.reply({
         content: `Battle created successfully! ${points} points have been deducted from your balance.`,
