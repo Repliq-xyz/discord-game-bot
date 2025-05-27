@@ -5,6 +5,7 @@ import { startGame } from "../commands/start-game";
 const COMMAND_HANDLED_BUTTONS = new Set([
   "up",
   "down",
+  "points_5",
   "points_10",
   "points_50",
   "points_100",
