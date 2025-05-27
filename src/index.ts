@@ -64,43 +64,72 @@ client.once(Events.ClientReady, async (readyClient) => {
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
-  if (interaction.isChatInputCommand()) {
-    const command = commandHandler.getCommands().get(interaction.commandName);
+  try {
+    if (interaction.isChatInputCommand()) {
+      const command = commandHandler.getCommands().get(interaction.commandName);
 
-    if (!command) {
-      console.error(`No command ${interaction.commandName} was found.`);
-      return;
-    }
+      if (!command) {
+        console.error(`No command ${interaction.commandName} was found.`);
+        return;
+      }
 
-    try {
-      console.log(`Executing command: ${interaction.commandName}`);
-      await command.execute(interaction);
-    } catch (error) {
-      console.error(
-        `Error executing command ${interaction.commandName}:`,
-        error
-      );
+      try {
+        console.log(`Executing command: ${interaction.commandName}`);
+        await command.execute(interaction);
+      } catch (error) {
+        console.error(
+          `Error executing command ${interaction.commandName}:`,
+          error
+        );
+        if (interaction.replied || interaction.deferred) {
+          await interaction.followUp({
+            content: "There was an error while executing this command!",
+            ephemeral: true,
+          });
+        } else {
+          await interaction.reply({
+            content: "There was an error while executing this command!",
+            ephemeral: true,
+          });
+        }
+      }
+    } else if (interaction.isButton()) {
+      // Check if interaction has already been handled
       if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({
-          content: "There was an error while executing this command!",
-          ephemeral: true,
-        });
+        return;
+      }
+
+      if (interaction.customId === "join_battle") {
+        await handleJoinBattle(interaction);
       } else {
+        await handleButtonInteraction(interaction);
+      }
+    } else if (interaction.isStringSelectMenu()) {
+      // Check if interaction has already been handled
+      if (interaction.replied || interaction.deferred) {
+        return;
+      }
+
+      if (interaction.customId === "select_token") {
+        await handleTokenSelect(interaction);
+      }
+    }
+  } catch (error) {
+    console.error("Error handling interaction:", error);
+    try {
+      // Only try to reply if the interaction hasn't been handled and is a command
+      if (
+        interaction.isChatInputCommand() &&
+        !interaction.replied &&
+        !interaction.deferred
+      ) {
         await interaction.reply({
-          content: "There was an error while executing this command!",
+          content: "An error occurred while processing your request.",
           ephemeral: true,
         });
       }
-    }
-  } else if (interaction.isButton()) {
-    if (interaction.customId === "join_battle") {
-      await handleJoinBattle(interaction);
-    } else {
-      await handleButtonInteraction(interaction);
-    }
-  } else if (interaction.isStringSelectMenu()) {
-    if (interaction.customId === "select_token") {
-      await handleTokenSelect(interaction);
+    } catch (replyError) {
+      console.error("Error sending error message:", replyError);
     }
   }
 });
