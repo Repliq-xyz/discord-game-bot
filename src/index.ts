@@ -58,16 +58,6 @@ client.once(Events.ClientReady, async (readyClient) => {
     const permanentMessageService = PermanentMessageService.getInstance();
     await permanentMessageService.createOrUpdateMessage(client);
     console.log("Permanent message created/updated successfully!");
-
-    // Log queue stats every minute
-    setInterval(async () => {
-      const predictionStats = await PredictionQueue.getQueueStats();
-      const battleStats = await BattleQueue.getQueueStats();
-      console.log("Queue stats:", {
-        prediction: predictionStats,
-        battle: battleStats,
-      });
-    }, 60000);
   } catch (error) {
     console.error("Error during initialization:", error);
   }
