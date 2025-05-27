@@ -236,9 +236,6 @@ export const command: Command = {
           }
 
           try {
-            // Defer the update to prevent interaction timeout
-            await pointsInteraction.deferUpdate();
-
             // Create Up and Down buttons
             const buttonRow =
               new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -270,8 +267,8 @@ export const command: Command = {
 
             console.log("Updating message with prediction buttons");
 
-            // Edit the deferred message
-            await pointsInteraction.editReply({
+            // Update the message with the new buttons
+            await pointsInteraction.update({
               embeds: [predictionEmbed],
               components: [buttonRow],
             });
@@ -302,9 +299,6 @@ export const command: Command = {
                 const choice = buttonInteraction.customId;
 
                 try {
-                  // Defer the update to prevent interaction timeout
-                  await buttonInteraction.deferUpdate();
-
                   // Calculate expiration date based on timeframe
                   const expiresAt = new Date(
                     Date.now() +
@@ -346,38 +340,99 @@ export const command: Command = {
                     )
                     .setFooter({ text: "Good luck!" });
 
-                  // Execute both operations in parallel
-                  await Promise.all([
-                    // Send confirmation message
-                    buttonInteraction.editReply({
-                      embeds: [successEmbed],
-                      components: [],
-                    }),
-                    // Create prediction
-                    PredictionService.createPrediction({
-                      userId: interaction.user.id,
-                      tokenAddress: selectedToken.tokenAddress,
-                      tokenName: selectedToken.name,
-                      timeframe,
-                      direction: choice.toUpperCase() as "UP" | "DOWN",
-                      expiresAt,
-                      pointsWagered: pointsToWager,
-                    }),
-                  ]);
+                  // Create prediction first
+                  const prediction = await PredictionService.createPrediction({
+                    userId: interaction.user.id,
+                    tokenAddress: selectedToken.tokenAddress,
+                    tokenName: selectedToken.name,
+                    timeframe,
+                    direction: choice.toUpperCase() as "UP" | "DOWN",
+                    expiresAt,
+                    pointsWagered: pointsToWager,
+                  });
+
+                  console.log("Prediction created successfully:", prediction);
+
+                  // Update the message with success
+                  await buttonInteraction.update({
+                    embeds: [successEmbed],
+                    components: [],
+                  });
 
                   // Stop the collector after successful prediction
                   buttonCollector.stop();
+
+                  // Send public message in the predictions channel
+                  try {
+                    const predictionsChannel =
+                      (await interaction.guild?.channels.fetch(
+                        process.env.FEED_CHANNEL_ID || ""
+                      )) as TextChannel;
+                    if (predictionsChannel) {
+                      const publicEmbed = new EmbedBuilder()
+                        .setColor("#0099ff")
+                        .setTitle("New Token Prediction")
+                        .setDescription(
+                          `${interaction.user} has made a new prediction!`
+                        )
+                        .addFields(
+                          {
+                            name: "User",
+                            value: `${interaction.user.username}`,
+                            inline: true,
+                          },
+                          {
+                            name: "Token",
+                            value: selectedToken.name,
+                            inline: true,
+                          },
+                          {
+                            name: "Timeframe",
+                            value: timeframeLabel,
+                            inline: true,
+                          },
+                          {
+                            name: "Direction",
+                            value: choice.toUpperCase(),
+                            inline: true,
+                          },
+                          {
+                            name: "Points Wagered",
+                            value: `${pointsToWager}`,
+                            inline: true,
+                          },
+                          {
+                            name: "Expires",
+                            value: `<t:${Math.floor(
+                              expiresAt.getTime() / 1000
+                            )}:R>`,
+                            inline: true,
+                          }
+                        )
+                        .setTimestamp()
+                        .setThumbnail(interaction.user.displayAvatarURL());
+
+                      await predictionsChannel.send({
+                        embeds: [publicEmbed],
+                      });
+                    }
+                  } catch (error) {
+                    console.error(
+                      "Error sending public prediction message:",
+                      error
+                    );
+                  }
                 } catch (error) {
                   console.error("Error in button interaction:", error);
                   try {
-                    await buttonInteraction.editReply({
+                    await buttonInteraction.update({
                       content:
                         "An error occurred while processing your prediction. Please try again.",
                       embeds: [],
                       components: [],
                     });
-                  } catch (editError) {
-                    console.error("Error editing reply:", editError);
+                  } catch (updateError) {
+                    console.error("Error updating message:", updateError);
                   }
                 }
               }
@@ -404,14 +459,14 @@ export const command: Command = {
           } catch (error) {
             console.error("Error in points selection:", error);
             try {
-              await pointsInteraction.editReply({
+              await pointsInteraction.update({
                 content:
                   "An error occurred while processing your points selection. Please try again.",
                 embeds: [],
                 components: [],
               });
-            } catch (editError) {
-              console.error("Error editing reply:", editError);
+            } catch (updateError) {
+              console.error("Error updating message:", updateError);
             }
             return;
           }
