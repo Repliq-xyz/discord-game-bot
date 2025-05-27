@@ -25,7 +25,7 @@ export class UserService {
       data: {
         id: params.id,
         username: params.username,
-        points: 0,
+        points: 100,
       },
     });
   }
