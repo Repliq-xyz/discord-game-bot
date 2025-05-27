@@ -276,10 +276,18 @@ export const command: Command = {
             console.log("Updating message with prediction buttons");
 
             // Update the message with the new buttons
-            await pointsInteraction.update({
-              embeds: [predictionEmbed],
-              components: [buttonRow],
-            });
+            try {
+              await pointsInteraction.update({
+                embeds: [predictionEmbed],
+                components: [buttonRow],
+              });
+            } catch (updateError) {
+              console.error(
+                "Error updating message with prediction buttons:",
+                updateError
+              );
+              return;
+            }
 
             // Create collector for buttons with increased timeout
             const buttonCollector = response.createMessageComponentCollector({
@@ -365,14 +373,17 @@ export const command: Command = {
                     .setFooter({ text: "Good luck!" });
 
                   // Update the message with success
-                  if (
-                    !buttonInteraction.replied &&
-                    !buttonInteraction.deferred
-                  ) {
+                  try {
                     await buttonInteraction.update({
                       embeds: [successEmbed],
                       components: [],
                     });
+                  } catch (updateError) {
+                    console.error(
+                      "Error updating message with success:",
+                      updateError
+                    );
+                    return;
                   }
 
                   // Send public message in the predictions channel
@@ -438,17 +449,12 @@ export const command: Command = {
                 } catch (error) {
                   console.error("Error in button interaction:", error);
                   try {
-                    if (
-                      !buttonInteraction.replied &&
-                      !buttonInteraction.deferred
-                    ) {
-                      await buttonInteraction.update({
-                        content:
-                          "An error occurred while processing your prediction. Please try again.",
-                        embeds: [],
-                        components: [],
-                      });
-                    }
+                    await buttonInteraction.update({
+                      content:
+                        "An error occurred while processing your prediction. Please try again.",
+                      embeds: [],
+                      components: [],
+                    });
                   } catch (updateError) {
                     console.error("Error updating message:", updateError);
                   }
