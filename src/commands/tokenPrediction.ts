@@ -155,6 +155,10 @@ export const command: Command = {
       // Create points input row
       const pointsRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
+          .setCustomId("points_5")
+          .setLabel("5 Points")
+          .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
           .setCustomId("points_10")
           .setLabel("10 Points")
           .setStyle(ButtonStyle.Secondary),
@@ -211,6 +215,9 @@ export const command: Command = {
 
           let pointsToWager = 0;
           switch (pointsInteraction.customId) {
+            case "points_5":
+              pointsToWager = 5;
+              break;
             case "points_10":
               pointsToWager = 10;
               break;
