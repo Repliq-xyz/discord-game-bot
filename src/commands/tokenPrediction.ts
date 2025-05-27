@@ -268,10 +268,12 @@ export const command: Command = {
             console.log("Updating message with prediction buttons");
 
             // Update the message with the new buttons
-            await pointsInteraction.update({
-              embeds: [predictionEmbed],
-              components: [buttonRow],
-            });
+            if (!pointsInteraction.replied && !pointsInteraction.deferred) {
+              await pointsInteraction.update({
+                embeds: [predictionEmbed],
+                components: [buttonRow],
+              });
+            }
 
             // Create collector for buttons with increased timeout
             const buttonCollector = response.createMessageComponentCollector({
@@ -354,10 +356,15 @@ export const command: Command = {
                   console.log("Prediction created successfully:", prediction);
 
                   // Update the message with success
-                  await buttonInteraction.update({
-                    embeds: [successEmbed],
-                    components: [],
-                  });
+                  if (
+                    !buttonInteraction.replied &&
+                    !buttonInteraction.deferred
+                  ) {
+                    await buttonInteraction.update({
+                      embeds: [successEmbed],
+                      components: [],
+                    });
+                  }
 
                   // Stop the collector after successful prediction
                   buttonCollector.stop();
