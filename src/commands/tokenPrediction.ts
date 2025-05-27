@@ -226,10 +226,12 @@ export const command: Command = {
           // Check if user has enough points
           if (user.points < pointsToWager) {
             console.log("User doesn't have enough points");
-            await pointsInteraction.reply({
-              content: "You don't have enough points!",
-              ephemeral: true,
-            });
+            if (!pointsInteraction.replied && !pointsInteraction.deferred) {
+              await pointsInteraction.reply({
+                content: "You don't have enough points!",
+                ephemeral: true,
+              });
+            }
             return;
           }
 
@@ -264,14 +266,141 @@ export const command: Command = {
               .setFooter({ text: "Choose UP or DOWN for your prediction" });
 
             console.log("Updating message with prediction buttons");
-            // Update message with buttons
-            await pointsInteraction.update({
-              embeds: [predictionEmbed],
-              components: [buttonRow],
+
+            // Check if interaction is still valid
+            if (pointsInteraction.replied || pointsInteraction.deferred) {
+              await pointsInteraction.editReply({
+                embeds: [predictionEmbed],
+                components: [buttonRow],
+              });
+            } else {
+              await pointsInteraction.update({
+                embeds: [predictionEmbed],
+                components: [buttonRow],
+              });
+            }
+
+            // Create collector for buttons with increased timeout
+            const buttonCollector = response.createMessageComponentCollector({
+              time: 120000, // 2 minutes timeout
+              filter: (i) =>
+                i.isButton() && (i.customId === "up" || i.customId === "down"),
+            });
+
+            buttonCollector.on(
+              "collect",
+              async (buttonInteraction: ButtonInteraction) => {
+                if (buttonInteraction.user.id !== interaction.user.id) {
+                  if (
+                    !buttonInteraction.replied &&
+                    !buttonInteraction.deferred
+                  ) {
+                    await buttonInteraction.reply({
+                      content: "It's not your turn!",
+                      ephemeral: true,
+                    });
+                  }
+                  return;
+                }
+
+                const choice = buttonInteraction.customId;
+
+                try {
+                  // Calculate expiration date based on timeframe
+                  const expiresAt = new Date(
+                    Date.now() +
+                      timeframes[timeframe as keyof typeof timeframes]
+                  );
+                  console.log(
+                    "Creating prediction with expiration:",
+                    expiresAt
+                  );
+
+                  // Create success embed
+                  const successEmbed = new EmbedBuilder()
+                    .setColor("#00ff00")
+                    .setTitle("Prediction Registered!")
+                    .setDescription(
+                      `Your prediction has been saved successfully`
+                    )
+                    .addFields(
+                      {
+                        name: "Token",
+                        value: selectedToken.name,
+                        inline: true,
+                      },
+                      {
+                        name: "Timeframe",
+                        value: timeframeLabel,
+                        inline: true,
+                      },
+                      {
+                        name: "Direction",
+                        value: choice.toUpperCase(),
+                        inline: true,
+                      },
+                      {
+                        name: "Points Wagered",
+                        value: `${pointsToWager}`,
+                        inline: true,
+                      }
+                    )
+                    .setFooter({ text: "Good luck!" });
+
+                  // Execute both operations in parallel
+                  await Promise.all([
+                    // Send confirmation message
+                    buttonInteraction.update({
+                      embeds: [successEmbed],
+                      components: [],
+                    }),
+                    // Create prediction
+                    PredictionService.createPrediction({
+                      userId: interaction.user.id,
+                      tokenAddress: selectedToken.tokenAddress,
+                      tokenName: selectedToken.name,
+                      timeframe,
+                      direction: choice.toUpperCase() as "UP" | "DOWN",
+                      expiresAt,
+                      pointsWagered: pointsToWager,
+                    }),
+                  ]);
+                } catch (error) {
+                  console.error("Error in button interaction:", error);
+                  if (
+                    !buttonInteraction.replied &&
+                    !buttonInteraction.deferred
+                  ) {
+                    await buttonInteraction.reply({
+                      content:
+                        "An error occurred while processing your prediction. Please try again.",
+                      ephemeral: true,
+                    });
+                  }
+                }
+              }
+            );
+
+            buttonCollector.on("end", (collected) => {
+              if (collected.size === 0) {
+                const timeoutEmbed = new EmbedBuilder()
+                  .setColor("#ff9900")
+                  .setTitle("Time's Up!")
+                  .setDescription(
+                    "No prediction was made within the time limit."
+                  )
+                  .setFooter({
+                    text: "Use the command again to make a new prediction",
+                  });
+
+                interaction.editReply({
+                  embeds: [timeoutEmbed],
+                  components: [],
+                });
+              }
             });
           } catch (error) {
             console.error("Error in points selection:", error);
-            // Check if the interaction has already been replied to
             if (!pointsInteraction.replied && !pointsInteraction.deferred) {
               try {
                 await pointsInteraction.reply({
@@ -296,187 +425,6 @@ export const command: Command = {
             }
             return;
           }
-
-          // Create collector for buttons
-          const buttonCollector = response.createMessageComponentCollector({
-            time: 60000,
-            filter: (i) =>
-              i.isButton() && (i.customId === "up" || i.customId === "down"),
-          });
-
-          buttonCollector.on(
-            "collect",
-            async (buttonInteraction: ButtonInteraction) => {
-              if (buttonInteraction.user.id !== interaction.user.id) {
-                if (!buttonInteraction.replied && !buttonInteraction.deferred) {
-                  await buttonInteraction.reply({
-                    content: "It's not your turn!",
-                    ephemeral: true,
-                  });
-                }
-                return;
-              }
-
-              const choice = buttonInteraction.customId;
-
-              try {
-                // Calculate expiration date based on timeframe
-                const expiresAt = new Date(
-                  Date.now() + timeframes[timeframe as keyof typeof timeframes]
-                );
-                console.log("Creating prediction with expiration:", expiresAt);
-
-                // Create success embed
-                const successEmbed = new EmbedBuilder()
-                  .setColor("#00ff00")
-                  .setTitle("Prediction Registered!")
-                  .setDescription(`Your prediction has been saved successfully`)
-                  .addFields(
-                    { name: "Token", value: selectedToken.name, inline: true },
-                    { name: "Timeframe", value: timeframeLabel, inline: true },
-                    {
-                      name: "Direction",
-                      value: choice.toUpperCase(),
-                      inline: true,
-                    },
-                    {
-                      name: "Points Wagered",
-                      value: `${pointsToWager}`,
-                      inline: true,
-                    }
-                  )
-                  .setFooter({ text: "Good luck!" });
-
-                // Execute both operations in parallel
-                await Promise.all([
-                  // Send confirmation message
-                  buttonInteraction.update({
-                    embeds: [successEmbed],
-                    components: [],
-                  }),
-                  // Create prediction
-                  PredictionService.createPrediction({
-                    userId: interaction.user.id,
-                    tokenAddress: selectedToken.tokenAddress,
-                    tokenName: selectedToken.name,
-                    timeframe,
-                    direction: choice.toUpperCase() as "UP" | "DOWN",
-                    expiresAt,
-                    pointsWagered: pointsToWager,
-                  })
-                    .then(async (prediction) => {
-                      console.log(
-                        "Prediction created successfully:",
-                        prediction
-                      );
-                      // Stop the collector after successful prediction
-                      buttonCollector.stop();
-
-                      // Send public message in the predictions channel
-                      try {
-                        const predictionsChannel =
-                          (await interaction.guild?.channels.fetch(
-                            process.env.FEED_CHANNEL_ID || ""
-                          )) as TextChannel;
-                        if (predictionsChannel) {
-                          const publicEmbed = new EmbedBuilder()
-                            .setColor("#0099ff")
-                            .setTitle("New Token Prediction")
-                            .setDescription(
-                              `${interaction.user} has made a new prediction!`
-                            )
-                            .addFields(
-                              {
-                                name: "User",
-                                value: `${interaction.user.username}`,
-                                inline: true,
-                              },
-                              {
-                                name: "Token",
-                                value: selectedToken.name,
-                                inline: true,
-                              },
-                              {
-                                name: "Timeframe",
-                                value: timeframeLabel,
-                                inline: true,
-                              },
-                              {
-                                name: "Direction",
-                                value: choice.toUpperCase(),
-                                inline: true,
-                              },
-                              {
-                                name: "Points Wagered",
-                                value: `${pointsToWager}`,
-                                inline: true,
-                              },
-                              {
-                                name: "Expires",
-                                value: `<t:${Math.floor(
-                                  expiresAt.getTime() / 1000
-                                )}:R>`,
-                                inline: true,
-                              }
-                            )
-                            .setTimestamp()
-                            .setThumbnail(interaction.user.displayAvatarURL());
-
-                          await predictionsChannel.send({
-                            embeds: [publicEmbed],
-                          });
-                        }
-                      } catch (error) {
-                        console.error(
-                          "Error sending public prediction message:",
-                          error
-                        );
-                      }
-                    })
-                    .catch((error) => {
-                      console.error("Error creating prediction:", error);
-                    }),
-                ]);
-              } catch (error) {
-                console.error("Error saving prediction:", error);
-
-                // Create error embed
-                const errorEmbed = new EmbedBuilder()
-                  .setColor("#ff0000")
-                  .setTitle("Error")
-                  .setDescription(
-                    "Failed to save your prediction. Please try again."
-                  )
-                  .setFooter({
-                    text: "If the problem persists, contact support",
-                  });
-
-                if (!buttonInteraction.replied && !buttonInteraction.deferred) {
-                  await buttonInteraction.update({
-                    embeds: [errorEmbed],
-                    components: [],
-                  });
-                }
-              }
-            }
-          );
-
-          buttonCollector.on("end", (collected) => {
-            if (collected.size === 0) {
-              const timeoutEmbed = new EmbedBuilder()
-                .setColor("#ff9900")
-                .setTitle("Time's Up!")
-                .setDescription("No prediction was made within the time limit.")
-                .setFooter({
-                  text: "Use the command again to make a new prediction",
-                });
-
-              interaction.editReply({
-                embeds: [timeoutEmbed],
-                components: [],
-              });
-            }
-          });
         }
       );
 
