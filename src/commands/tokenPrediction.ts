@@ -220,8 +220,12 @@ export const command: Command = {
               break;
           }
 
+          console.log("Points to wager:", pointsToWager);
+          console.log("User points:", user.points);
+
           // Check if user has enough points
           if (user.points < pointsToWager) {
+            console.log("User doesn't have enough points");
             await pointsInteraction.reply({
               content: "You don't have enough points!",
               ephemeral: true,
@@ -229,39 +233,51 @@ export const command: Command = {
             return;
           }
 
-          // Create Up and Down buttons
-          const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-            new ButtonBuilder()
-              .setCustomId("up")
-              .setLabel("UP")
-              .setStyle(ButtonStyle.Success),
-            new ButtonBuilder()
-              .setCustomId("down")
-              .setLabel("DOWN")
-              .setStyle(ButtonStyle.Danger)
-          );
+          try {
+            // Create Up and Down buttons
+            const buttonRow =
+              new ActionRowBuilder<ButtonBuilder>().addComponents(
+                new ButtonBuilder()
+                  .setCustomId("up")
+                  .setLabel("UP")
+                  .setStyle(ButtonStyle.Success),
+                new ButtonBuilder()
+                  .setCustomId("down")
+                  .setLabel("DOWN")
+                  .setStyle(ButtonStyle.Danger)
+              );
 
-          // Create embed for prediction
-          const predictionEmbed = new EmbedBuilder()
-            .setColor("#0099ff")
-            .setTitle("Make Your Prediction")
-            .setDescription(`Token: ${selectedToken.name}`)
-            .addFields(
-              { name: "Timeframe", value: timeframeLabel, inline: true },
-              {
-                name: "Points Wagered",
-                value: `${pointsToWager}`,
-                inline: true,
-              },
-              { name: "Your Points", value: `${user.points}`, inline: true }
-            )
-            .setFooter({ text: "Choose UP or DOWN for your prediction" });
+            // Create embed for prediction
+            const predictionEmbed = new EmbedBuilder()
+              .setColor("#0099ff")
+              .setTitle("Make Your Prediction")
+              .setDescription(`Token: ${selectedToken.name}`)
+              .addFields(
+                { name: "Timeframe", value: timeframeLabel, inline: true },
+                {
+                  name: "Points Wagered",
+                  value: `${pointsToWager}`,
+                  inline: true,
+                },
+                { name: "Your Points", value: `${user.points}`, inline: true }
+              )
+              .setFooter({ text: "Choose UP or DOWN for your prediction" });
 
-          // Update message with buttons
-          await pointsInteraction.update({
-            embeds: [predictionEmbed],
-            components: [buttonRow],
-          });
+            console.log("Updating message with prediction buttons");
+            // Update message with buttons
+            await pointsInteraction.update({
+              embeds: [predictionEmbed],
+              components: [buttonRow],
+            });
+          } catch (error) {
+            console.error("Error in points selection:", error);
+            await pointsInteraction.reply({
+              content:
+                "An error occurred while processing your points selection. Please try again.",
+              ephemeral: true,
+            });
+            return;
+          }
 
           // Create collector for buttons
           const buttonCollector = response.createMessageComponentCollector({
