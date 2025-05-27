@@ -271,11 +271,29 @@ export const command: Command = {
             });
           } catch (error) {
             console.error("Error in points selection:", error);
-            await pointsInteraction.reply({
-              content:
-                "An error occurred while processing your points selection. Please try again.",
-              ephemeral: true,
-            });
+            // Check if the interaction has already been replied to
+            if (!pointsInteraction.replied && !pointsInteraction.deferred) {
+              try {
+                await pointsInteraction.reply({
+                  content:
+                    "An error occurred while processing your points selection. Please try again.",
+                  ephemeral: true,
+                });
+              } catch (replyError) {
+                console.error("Error sending error message:", replyError);
+              }
+            } else {
+              try {
+                await pointsInteraction.editReply({
+                  content:
+                    "An error occurred while processing your points selection. Please try again.",
+                  embeds: [],
+                  components: [],
+                });
+              } catch (editError) {
+                console.error("Error editing reply:", editError);
+              }
+            }
             return;
           }
 
