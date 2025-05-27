@@ -236,6 +236,9 @@ export const command: Command = {
           }
 
           try {
+            // Defer the update to prevent interaction timeout
+            await pointsInteraction.deferUpdate();
+
             // Create Up and Down buttons
             const buttonRow =
               new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -267,18 +270,11 @@ export const command: Command = {
 
             console.log("Updating message with prediction buttons");
 
-            // Check if interaction is still valid
-            if (pointsInteraction.replied || pointsInteraction.deferred) {
-              await pointsInteraction.editReply({
-                embeds: [predictionEmbed],
-                components: [buttonRow],
-              });
-            } else {
-              await pointsInteraction.update({
-                embeds: [predictionEmbed],
-                components: [buttonRow],
-              });
-            }
+            // Edit the deferred message
+            await pointsInteraction.editReply({
+              embeds: [predictionEmbed],
+              components: [buttonRow],
+            });
 
             // Create collector for buttons with increased timeout
             const buttonCollector = response.createMessageComponentCollector({
@@ -306,6 +302,9 @@ export const command: Command = {
                 const choice = buttonInteraction.customId;
 
                 try {
+                  // Defer the update to prevent interaction timeout
+                  await buttonInteraction.deferUpdate();
+
                   // Calculate expiration date based on timeframe
                   const expiresAt = new Date(
                     Date.now() +
@@ -350,7 +349,7 @@ export const command: Command = {
                   // Execute both operations in parallel
                   await Promise.all([
                     // Send confirmation message
-                    buttonInteraction.update({
+                    buttonInteraction.editReply({
                       embeds: [successEmbed],
                       components: [],
                     }),
@@ -365,17 +364,20 @@ export const command: Command = {
                       pointsWagered: pointsToWager,
                     }),
                   ]);
+
+                  // Stop the collector after successful prediction
+                  buttonCollector.stop();
                 } catch (error) {
                   console.error("Error in button interaction:", error);
-                  if (
-                    !buttonInteraction.replied &&
-                    !buttonInteraction.deferred
-                  ) {
-                    await buttonInteraction.reply({
+                  try {
+                    await buttonInteraction.editReply({
                       content:
                         "An error occurred while processing your prediction. Please try again.",
-                      ephemeral: true,
+                      embeds: [],
+                      components: [],
                     });
+                  } catch (editError) {
+                    console.error("Error editing reply:", editError);
                   }
                 }
               }
@@ -401,27 +403,15 @@ export const command: Command = {
             });
           } catch (error) {
             console.error("Error in points selection:", error);
-            if (!pointsInteraction.replied && !pointsInteraction.deferred) {
-              try {
-                await pointsInteraction.reply({
-                  content:
-                    "An error occurred while processing your points selection. Please try again.",
-                  ephemeral: true,
-                });
-              } catch (replyError) {
-                console.error("Error sending error message:", replyError);
-              }
-            } else {
-              try {
-                await pointsInteraction.editReply({
-                  content:
-                    "An error occurred while processing your points selection. Please try again.",
-                  embeds: [],
-                  components: [],
-                });
-              } catch (editError) {
-                console.error("Error editing reply:", editError);
-              }
+            try {
+              await pointsInteraction.editReply({
+                content:
+                  "An error occurred while processing your points selection. Please try again.",
+                embeds: [],
+                components: [],
+              });
+            } catch (editError) {
+              console.error("Error editing reply:", editError);
             }
             return;
           }
