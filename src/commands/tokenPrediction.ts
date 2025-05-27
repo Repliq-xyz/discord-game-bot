@@ -149,6 +149,9 @@ export const command: Command = {
           break;
       }
 
+      // Stop the timeframe collector before proceeding
+      timeframeCollector.stop();
+
       // Create points input row
       const pointsRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
@@ -197,10 +200,12 @@ export const command: Command = {
         "collect",
         async (pointsInteraction: ButtonInteraction) => {
           if (pointsInteraction.user.id !== interaction.user.id) {
-            await pointsInteraction.reply({
-              content: "It's not your turn!",
-              ephemeral: true,
-            });
+            if (!pointsInteraction.replied && !pointsInteraction.deferred) {
+              await pointsInteraction.reply({
+                content: "It's not your turn!",
+                ephemeral: true,
+              });
+            }
             return;
           }
 
@@ -236,6 +241,9 @@ export const command: Command = {
           }
 
           try {
+            // Stop the points collector before creating the new one
+            pointsCollector.stop();
+
             // Create Up and Down buttons
             const buttonRow =
               new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -268,12 +276,10 @@ export const command: Command = {
             console.log("Updating message with prediction buttons");
 
             // Update the message with the new buttons
-            if (!pointsInteraction.replied && !pointsInteraction.deferred) {
-              await pointsInteraction.update({
-                embeds: [predictionEmbed],
-                components: [buttonRow],
-              });
-            }
+            await pointsInteraction.update({
+              embeds: [predictionEmbed],
+              components: [buttonRow],
+            });
 
             // Create collector for buttons with increased timeout
             const buttonCollector = response.createMessageComponentCollector({
@@ -297,6 +303,9 @@ export const command: Command = {
                   }
                   return;
                 }
+
+                // Stop the collector immediately to prevent multiple responses
+                buttonCollector.stop();
 
                 const choice = buttonInteraction.customId;
 
@@ -356,18 +365,10 @@ export const command: Command = {
                   console.log("Prediction created successfully:", prediction);
 
                   // Update the message with success
-                  if (
-                    !buttonInteraction.replied &&
-                    !buttonInteraction.deferred
-                  ) {
-                    await buttonInteraction.update({
-                      embeds: [successEmbed],
-                      components: [],
-                    });
-                  }
-
-                  // Stop the collector after successful prediction
-                  buttonCollector.stop();
+                  await buttonInteraction.update({
+                    embeds: [successEmbed],
+                    components: [],
+                  });
 
                   // Send public message in the predictions channel
                   try {
