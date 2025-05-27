@@ -320,6 +320,19 @@ export const command: Command = {
                     expiresAt
                   );
 
+                  // Create prediction first
+                  const prediction = await PredictionService.createPrediction({
+                    userId: interaction.user.id,
+                    tokenAddress: selectedToken.tokenAddress,
+                    tokenName: selectedToken.name,
+                    timeframe,
+                    direction: choice.toUpperCase() as "UP" | "DOWN",
+                    expiresAt,
+                    pointsWagered: pointsToWager,
+                  });
+
+                  console.log("Prediction created successfully:", prediction);
+
                   // Create success embed
                   const successEmbed = new EmbedBuilder()
                     .setColor("#00ff00")
@@ -351,24 +364,16 @@ export const command: Command = {
                     )
                     .setFooter({ text: "Good luck!" });
 
-                  // Create prediction first
-                  const prediction = await PredictionService.createPrediction({
-                    userId: interaction.user.id,
-                    tokenAddress: selectedToken.tokenAddress,
-                    tokenName: selectedToken.name,
-                    timeframe,
-                    direction: choice.toUpperCase() as "UP" | "DOWN",
-                    expiresAt,
-                    pointsWagered: pointsToWager,
-                  });
-
-                  console.log("Prediction created successfully:", prediction);
-
                   // Update the message with success
-                  await buttonInteraction.update({
-                    embeds: [successEmbed],
-                    components: [],
-                  });
+                  if (
+                    !buttonInteraction.replied &&
+                    !buttonInteraction.deferred
+                  ) {
+                    await buttonInteraction.update({
+                      embeds: [successEmbed],
+                      components: [],
+                    });
+                  }
 
                   // Send public message in the predictions channel
                   try {
@@ -433,12 +438,17 @@ export const command: Command = {
                 } catch (error) {
                   console.error("Error in button interaction:", error);
                   try {
-                    await buttonInteraction.update({
-                      content:
-                        "An error occurred while processing your prediction. Please try again.",
-                      embeds: [],
-                      components: [],
-                    });
+                    if (
+                      !buttonInteraction.replied &&
+                      !buttonInteraction.deferred
+                    ) {
+                      await buttonInteraction.update({
+                        content:
+                          "An error occurred while processing your prediction. Please try again.",
+                        embeds: [],
+                        components: [],
+                      });
+                    }
                   } catch (updateError) {
                     console.error("Error updating message:", updateError);
                   }
