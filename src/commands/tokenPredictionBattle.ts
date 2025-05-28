@@ -57,9 +57,10 @@ export const command: Command = {
     .addIntegerOption((option) =>
       option
         .setName("points")
-        .setDescription("Points to bet")
+        .setDescription("Points to bet (max 30)")
         .setRequired(true)
         .setMinValue(1)
+        .setMaxValue(30)
     ),
 
   async execute(interaction: CommandInteraction) {
@@ -74,6 +75,14 @@ export const command: Command = {
       if (!token || !timeframe || !points) {
         await interaction.reply({
           content: "Missing required options",
+          ephemeral: true,
+        });
+        return;
+      }
+
+      if (points > 30) {
+        await interaction.reply({
+          content: "The maximum number of points you can bet is 30.",
           ephemeral: true,
         });
         return;

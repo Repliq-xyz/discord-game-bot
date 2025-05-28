@@ -124,7 +124,7 @@ export class PermanentMessageService {
     const battleEmbed = new EmbedBuilder()
       .setTitle("⚔️ Token Prediction Battle")
       .setDescription(
-        "Use `/tokenbattle` to challenge other players! Win battles to earn more points and climb the leaderboard."
+        "Use `/tokenbattle` to challenge other players! Win battles to earn more points and climb the leaderboard. Battle points are 1.5x the points you wager."
       )
       .setColor("#0099ff");
 
