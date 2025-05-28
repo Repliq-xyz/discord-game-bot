@@ -81,7 +81,7 @@ export class BattleQueue {
                     // Give points to winner
                     await UserService.updatePoints(
                       result.winner,
-                      battle.points * 2
+                      battle.points * 1.5
                     );
 
                     const resultEmbed = {
@@ -91,7 +91,7 @@ export class BattleQueue {
                       fields: [
                         {
                           name: "Points Won",
-                          value: (battle.points * 2).toString(),
+                          value: (battle.points * 1.5).toString(),
                           inline: true,
                         },
                         {

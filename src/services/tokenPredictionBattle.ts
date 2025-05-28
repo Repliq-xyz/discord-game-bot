@@ -329,7 +329,7 @@ export class TokenPredictionBattle {
               },
               {
                 name: "Points Won",
-                value: (result.points * 2).toString(),
+                value: (result.points * 1.5).toString(),
                 inline: true,
               },
               {
