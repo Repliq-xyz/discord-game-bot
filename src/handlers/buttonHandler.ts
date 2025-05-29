@@ -11,6 +11,7 @@ const COMMAND_HANDLED_BUTTONS = new Set([
   "points_100",
   "points_max",
   "join_battle",
+  "quick_reward_claim",
 ]);
 
 export async function handleButtonInteraction(interaction: ButtonInteraction) {
