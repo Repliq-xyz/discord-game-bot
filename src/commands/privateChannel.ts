@@ -178,28 +178,93 @@ export async function createPrivateThread(user: User): Promise<ThreadChannel> {
   // Get user points
   const userPoints = await UserService.getUserPoints(user.id);
 
-  // Find or create GAMES channel
+  // Find or create PRIVATE category
+  let privateCategory = guild.channels.cache.find(
+    (channel) =>
+      channel.type === ChannelType.GuildCategory && channel.name === "PRIVATE"
+  ) as CategoryChannel | undefined;
+
+  if (!privateCategory) {
+    privateCategory = await guild.channels.create({
+      name: "PRIVATE",
+      type: ChannelType.GuildCategory,
+      permissionOverwrites: [
+        {
+          id: guild.id, // @everyone role
+          deny: [PermissionFlagsBits.ViewChannel],
+        },
+        {
+          id: guild.members.me!.id, // Bot role
+          allow: [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.SendMessages,
+            PermissionFlagsBits.ReadMessageHistory,
+            PermissionFlagsBits.ManageChannels,
+          ],
+        },
+      ],
+    });
+  }
+
+  // Find or create GAMES channel in PRIVATE category
   let gamesChannel = guild.channels.cache.find(
     (channel) =>
-      channel.type === ChannelType.GuildText && channel.name === "games"
+      channel.type === ChannelType.GuildText &&
+      channel.name === "games" &&
+      channel.parentId === privateCategory.id
   ) as TextChannel | undefined;
 
   if (!gamesChannel) {
     gamesChannel = await guild.channels.create({
       name: "games",
       type: ChannelType.GuildText,
+      parent: privateCategory.id,
       permissionOverwrites: [
         {
           id: guild.id, // @everyone role
           allow: [
             PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.ReadMessageHistory,
+          ],
+          deny: [
+            PermissionFlagsBits.SendMessages,
+            PermissionFlagsBits.CreatePublicThreads,
+          ],
+        },
+        {
+          id: guild.members.me!.id, // Bot role
+          allow: [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.SendMessages,
+            PermissionFlagsBits.ReadMessageHistory,
+            PermissionFlagsBits.ManageChannels,
             PermissionFlagsBits.CreatePublicThreads,
             PermissionFlagsBits.CreatePrivateThreads,
           ],
         },
       ],
     });
+
+    // Send welcome message in games channel
+    const welcomeMessage = new EmbedBuilder()
+      .setColor("#0099ff")
+      .setTitle("🎮 Games Channel")
+      .setDescription("Use `/start-games` to create your private games thread!")
+      .setFooter({ text: "Each user can only access their own thread" });
+
+    await gamesChannel.send({ embeds: [welcomeMessage] });
   }
+
+  // Create private thread
+  const thread = await gamesChannel.threads.create({
+    name: `games-${user.username}`,
+    autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek,
+    type: ChannelType.PrivateThread,
+    reason: `Private games thread for ${user.username}`,
+  });
+
+  // Add user to thread
+  await thread.members.add(user.id);
 
   // Create welcome embed
   const welcomeEmbed = new EmbedBuilder()
@@ -225,17 +290,6 @@ export async function createPrivateThread(user: User): Promise<ThreadChannel> {
         inline: false,
       }))
     );
-
-  // Create private thread
-  const thread = await gamesChannel.threads.create({
-    name: `games-${user.username}`,
-    autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek,
-    type: ChannelType.PrivateThread,
-    reason: `Private games thread for ${user.username}`,
-  });
-
-  // Add user to thread
-  await thread.members.add(user.id);
 
   // Send welcome message and games info
   await thread.send({ embeds: [welcomeEmbed] });
