@@ -12,7 +12,7 @@ import { TokenPredictionBattle } from "../services/tokenPredictionBattle";
 import { BattleQueue } from "../services/battleQueue";
 import { tokens } from "../data/tokens";
 import { UserService } from "../services/userService";
-import { checkPrivateGamesChannel } from "../utils/channelCheck";
+import { checkPrivateGamesThread } from "../utils/channelCheck";
 
 // Fonction utilitaire pour calculer le temps de fin
 function calculateEndTime(startTime: number, timeframe: string): number {
@@ -66,7 +66,7 @@ export const command: Command = {
   async execute(interaction: CommandInteraction) {
     try {
       // Vérifier si la commande est exécutée dans le bon canal
-      if (!(await checkPrivateGamesChannel(interaction))) return;
+      if (!(await checkPrivateGamesThread(interaction))) return;
 
       const token = interaction.options.get("token")?.value as string;
       const timeframe = interaction.options.get("timeframe")?.value as string;

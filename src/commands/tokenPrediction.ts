@@ -14,7 +14,7 @@ import { Command } from "../types/Command";
 import { tokens } from "../data/tokens";
 import { PredictionService } from "../services/predictionService";
 import { UserService } from "../services/userService";
-import { checkPrivateGamesChannel } from "../utils/channelCheck";
+import { checkPrivateGamesThread } from "../utils/channelCheck";
 
 const timeframes = {
   "5m": 5 * 60 * 1000, // 5 minutes en millisecondes
@@ -43,7 +43,7 @@ export const command: Command = {
     if (!interaction.isChatInputCommand()) return;
 
     // Vérifier si la commande est exécutée dans le bon canal
-    if (!(await checkPrivateGamesChannel(interaction))) return;
+    if (!(await checkPrivateGamesThread(interaction))) return;
 
     // Create or update user
     const user = await UserService.getOrCreateUser({
