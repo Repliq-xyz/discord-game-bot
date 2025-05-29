@@ -1,11 +1,11 @@
 import { ButtonInteraction } from "discord.js";
-import { createPrivateChannel } from "./privateChannel";
+import { createPrivateChannel, createPrivateThread } from "./privateChannel";
 
 export async function startGame(interaction: ButtonInteraction) {
   try {
-    const channel = await createPrivateChannel(interaction.user);
+    const thread = await createPrivateThread(interaction.user);
     await interaction.reply({
-      content: `Your private games channel has been created: ${channel}`,
+      content: `Your private games thread has been created: ${thread}`,
       ephemeral: true,
     });
   } catch (error) {

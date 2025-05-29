@@ -7,6 +7,8 @@ import {
   EmbedBuilder,
   CategoryChannel,
   User,
+  ThreadAutoArchiveDuration,
+  ThreadChannel,
 } from "discord.js";
 import { Command } from "../types/Command";
 import { UserService } from "../services/userService";
@@ -167,10 +169,85 @@ export async function createPrivateChannel(user: User): Promise<TextChannel> {
   return channel;
 }
 
+export async function createPrivateThread(user: User): Promise<ThreadChannel> {
+  const guild = user.client.guilds.cache.first();
+  if (!guild) {
+    throw new Error("No guild found");
+  }
+
+  // Get user points
+  const userPoints = await UserService.getUserPoints(user.id);
+
+  // Find or create GAMES channel
+  let gamesChannel = guild.channels.cache.find(
+    (channel) =>
+      channel.type === ChannelType.GuildText && channel.name === "games"
+  ) as TextChannel | undefined;
+
+  if (!gamesChannel) {
+    gamesChannel = await guild.channels.create({
+      name: "games",
+      type: ChannelType.GuildText,
+      permissionOverwrites: [
+        {
+          id: guild.id, // @everyone role
+          allow: [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.CreatePublicThreads,
+            PermissionFlagsBits.CreatePrivateThreads,
+          ],
+        },
+      ],
+    });
+  }
+
+  // Create welcome embed
+  const welcomeEmbed = new EmbedBuilder()
+    .setColor("#0099ff")
+    .setTitle(`Welcome ${user.username}!`)
+    .setDescription(`You currently have **${userPoints} points**`)
+    .addFields({
+      name: "💎 Daily Points",
+      value: "Use `/claim` to get your daily 20 points!",
+      inline: false,
+    })
+    .setFooter({ text: "Use slash commands to play games!" });
+
+  // Create games info embed
+  const gamesEmbed = new EmbedBuilder()
+    .setColor("#0099ff")
+    .setTitle("🎮 Available Games")
+    .setDescription("Here are the games you can play:")
+    .addFields(
+      Object.entries(GAMES_INFO).map(([game, info]) => ({
+        name: `/${game}`,
+        value: `${info.description}\n**Usage:** ${info.usage}\n**Rewards:** ${info.rewards}`,
+        inline: false,
+      }))
+    );
+
+  // Create private thread
+  const thread = await gamesChannel.threads.create({
+    name: `games-${user.username}`,
+    autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek,
+    type: ChannelType.PrivateThread,
+    reason: `Private games thread for ${user.username}`,
+  });
+
+  // Add user to thread
+  await thread.members.add(user.id);
+
+  // Send welcome message and games info
+  await thread.send({ embeds: [welcomeEmbed] });
+  await thread.send({ embeds: [gamesEmbed] });
+
+  return thread;
+}
+
 export const command: Command = {
   data: new SlashCommandBuilder()
     .setName("start-games")
-    .setDescription("Create or access your private games channel"),
+    .setDescription("Create or access your private games thread"),
 
   async execute(interaction: CommandInteraction) {
     if (!interaction.guild) {
@@ -182,16 +259,16 @@ export const command: Command = {
     }
 
     try {
-      const channel = await createPrivateChannel(interaction.user);
+      const thread = await createPrivateThread(interaction.user);
       await interaction.reply({
-        content: `Your private games channel has been created: ${channel}`,
+        content: `Your private games thread has been created: ${thread}`,
         ephemeral: true,
       });
     } catch (error) {
-      console.error("Error creating private games channel:", error);
+      console.error("Error creating private games thread:", error);
       await interaction.reply({
         content:
-          "An error occurred while creating your private games channel. Please try again later.",
+          "An error occurred while creating your private games thread. Please try again later.",
         ephemeral: true,
       });
     }
