@@ -1,7 +1,7 @@
 import { SlashCommandBuilder, CommandInteraction } from "discord.js";
 import { Command } from "../types/Command";
 import { UserService } from "../services/userService";
-import { checkPrivateGamesChannel } from "../utils/channelCheck";
+import { checkPrivateGamesThread } from "../utils/channelCheck";
 
 export const command: Command = {
   data: new SlashCommandBuilder()
@@ -11,7 +11,7 @@ export const command: Command = {
   async execute(interaction: CommandInteraction) {
     try {
       // Vérifier si la commande est exécutée dans le bon canal
-      if (!(await checkPrivateGamesChannel(interaction))) return;
+      if (!(await checkPrivateGamesThread(interaction))) return;
 
       // Ensure user exists
       await UserService.getOrCreateUser({
