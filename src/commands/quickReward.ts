@@ -111,68 +111,93 @@ export const command: Command = {
       const winnersList: string[] = [];
 
       collector.on("collect", async (i) => {
-        if (winnersList.includes(i.user.id)) {
+        try {
+          if (winnersList.includes(i.user.id)) {
+            await i.reply({
+              content: "You've already claimed this reward!",
+              ephemeral: true,
+            });
+            return;
+          }
+
+          winnersList.push(i.user.id);
+          await UserService.updatePoints(i.user.id, points);
+
           await i.reply({
-            content: "You've already claimed this reward!",
+            content: `Congratulations! You've won ${points} points!`,
             ephemeral: true,
           });
-          return;
-        }
 
-        winnersList.push(i.user.id);
-        await UserService.updatePoints(i.user.id, points);
+          // Update the embed to show remaining spots
+          const remainingSpots = winners - winnersList.length;
+          if (remainingSpots > 0) {
+            const updatedEmbed = EmbedBuilder.from(rewardEmbed).setDescription(
+              `Be one of the first ${winners} to click the button below to claim ${points} points!\n\nRemaining spots: ${remainingSpots}`
+            );
 
-        await i.reply({
-          content: `Congratulations! You've won ${points} points!`,
-          ephemeral: true,
-        });
-
-        // Update the embed to show remaining spots
-        const remainingSpots = winners - winnersList.length;
-        if (remainingSpots > 0) {
-          const updatedEmbed = EmbedBuilder.from(rewardEmbed).setDescription(
-            `Be one of the first ${winners} to click the button below to claim ${points} points!\n\nRemaining spots: ${remainingSpots}`
-          );
-
-          await message.edit({
-            embeds: [updatedEmbed],
-            components: [row],
-          });
+            await message.edit({
+              embeds: [updatedEmbed],
+              components: [row],
+            });
+          } else {
+            // If all spots are filled, end the collector
+            collector.stop("all_spots_filled");
+          }
+        } catch (error) {
+          console.error("Error handling button click:", error);
+          try {
+            if (!i.replied && !i.deferred) {
+              await i.reply({
+                content:
+                  "An error occurred while processing your claim. Please try again.",
+                ephemeral: true,
+              });
+            }
+          } catch (replyError) {
+            console.error("Error sending error message:", replyError);
+          }
         }
       });
 
-      collector.on("end", async (collected) => {
-        // Disable the button
-        const disabledButton = ButtonBuilder.from(button)
-          .setDisabled(true)
-          .setLabel("Reward Ended");
+      collector.on("end", async (collected, reason) => {
+        try {
+          // Disable the button
+          const disabledButton = ButtonBuilder.from(button)
+            .setDisabled(true)
+            .setLabel("Reward Ended");
 
-        const disabledRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-          disabledButton
-        );
+          const disabledRow =
+            new ActionRowBuilder<ButtonBuilder>().addComponents(disabledButton);
 
-        // Create final embed
-        const finalEmbed = new EmbedBuilder()
-          .setColor("#808080")
-          .setTitle("🎁 Quick Reward Ended")
-          .setDescription(
-            `This reward has ended. ${winnersList.length} users won ${points} points each!`
-          )
-          .addFields(
-            { name: "Points Awarded", value: points.toString(), inline: true },
-            {
-              name: "Number of Winners",
-              value: winnersList.length.toString(),
-              inline: true,
-            }
-          )
-          .setFooter({ text: `Created by ${interaction.user.username}` })
-          .setTimestamp();
+          // Create final embed
+          const finalEmbed = new EmbedBuilder()
+            .setColor("#808080")
+            .setTitle("🎁 Quick Reward Ended")
+            .setDescription(
+              `This reward has ended. ${winnersList.length} users won ${points} points each!`
+            )
+            .addFields(
+              {
+                name: "Points Awarded",
+                value: points.toString(),
+                inline: true,
+              },
+              {
+                name: "Number of Winners",
+                value: winnersList.length.toString(),
+                inline: true,
+              }
+            )
+            .setFooter({ text: `Created by ${interaction.user.username}` })
+            .setTimestamp();
 
-        await message.edit({
-          embeds: [finalEmbed],
-          components: [disabledRow],
-        });
+          await message.edit({
+            embeds: [finalEmbed],
+            components: [disabledRow],
+          });
+        } catch (error) {
+          console.error("Error ending reward:", error);
+        }
       });
 
       await interaction.reply({
