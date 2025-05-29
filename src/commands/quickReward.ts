@@ -106,11 +106,11 @@ export const command: Command = {
       // Create a collector for the button clicks
       const collector = message.createMessageComponentCollector({
         filter: (i) => i.customId === "quick_reward_claim",
-        max: winners,
         time: 5 * 60 * 1000, // 5 minutes
       });
 
       const winnersList: string[] = [];
+      let isCollectorEnded = false;
 
       collector.on("collect", async (i) => {
         console.log("Button clicked by user:", i.user.id);
@@ -118,6 +118,15 @@ export const command: Command = {
         console.log("Current winners count:", winnersList.length);
 
         try {
+          if (isCollectorEnded) {
+            console.log("Collector has ended, ignoring click");
+            await i.reply({
+              content: "This reward has already ended.",
+              ephemeral: true,
+            });
+            return;
+          }
+
           if (winnersList.includes(i.user.id)) {
             console.log("User already claimed:", i.user.id);
             await i.reply({
@@ -160,6 +169,7 @@ export const command: Command = {
             }
           } else {
             console.log("All spots filled, stopping collector");
+            isCollectorEnded = true;
             collector.stop("all_spots_filled");
           }
         } catch (error) {
@@ -187,6 +197,7 @@ export const command: Command = {
         console.log("Collector ended. Reason:", reason);
         console.log("Total winners:", winnersList.length);
         console.log("Winners list:", winnersList);
+        isCollectorEnded = true;
 
         try {
           // Disable the button
